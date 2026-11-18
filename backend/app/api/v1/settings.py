@@ -15,9 +15,9 @@ class UserSettings(BaseModel):
 
 CURRENT_SETTINGS = {
     "profile": {
-        "name": "Alex Vance",
-        "email": "creator@aishortsfactory.com",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "name": "Adhrit Chopdekar",
+        "email": "adhrit@shortsfactory.io",
+        "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
         "role": "Creator Pro Plan"
     },
     "youtube_account": {

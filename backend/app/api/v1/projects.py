@@ -2,8 +2,10 @@ import os
 import uuid
 import json
 import shutil
+import threading
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File, Form, Depends, status
 from backend.app.core.config import settings
 from backend.app.core.database import get_db_connection
@@ -12,9 +14,19 @@ from backend.app.models.schemas import (
 )
 from backend.app.services.ffmpeg_service import ffmpeg_service
 from backend.app.services.usage_service import check_permission_and_quota, deduct_usage
+from backend.app.services.youtube_downloader import extract_youtube_video_id, get_youtube_metadata, download_youtube_video_file
+from backend.app.services.analysis_manager import analysis_manager
 from backend.app.api.deps import get_current_user
 
 router = APIRouter()
+
+class ImportYouTubeRequest(BaseModel):
+    youtube_url: str
+    name: Optional[str] = None
+    category: Optional[str] = "automatic"
+    target_clip_count: Optional[int] = 5
+    preferred_duration_seconds: Optional[int] = 30
+    auto_generate_shorts: Optional[bool] = True
 
 # Seed default projects into SQLite if empty
 def ensure_default_projects():
@@ -261,6 +273,186 @@ async def upload_video_and_create_project(
         "storage_path": dest_path,
         "thumbnail_url": thumb_url,
         "metadata": probe
+    }
+
+@router.post("/import-youtube")
+def import_youtube_video(
+    payload: ImportYouTubeRequest,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Imports a video directly from YouTube via URL, downloads the media stream,
+    validates quotas, registers the project, and automatically launches the
+    AI highlight detection / clip hunter pipeline.
+    """
+    video_id = extract_youtube_video_id(payload.youtube_url)
+    if not video_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid YouTube URL. Please provide a valid YouTube watch or shorts URL."
+        )
+
+    project_id = str(uuid.uuid4())
+    user_id = user["id"]
+
+    try:
+        download_res = download_youtube_video_file(payload.youtube_url, project_id=project_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process YouTube video: {str(e)}"
+        )
+
+    probe = download_res["probe"]
+    dest_path = download_res["storage_path"]
+    duration = probe.get("duration", 30.0)
+    duration_mins = max(0.1, duration / 60.0)
+
+    # Enforce quota check
+    allowed, reason, upgrade_info = check_permission_and_quota(
+        user_id=user_id,
+        metric_type="video_processing_minutes",
+        amount=duration_mins
+    )
+    if not allowed:
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=reason or "Monthly video processing quota exceeded. Please upgrade your plan."
+        )
+
+    # Deduct usage
+    deduct_usage(
+        user_id=user_id,
+        metric_type="video_processing_minutes",
+        amount=duration_mins,
+        resource_id=project_id,
+        description=f"Imported YouTube video '{download_res['title']}' ({duration_mins:.1f} mins)"
+    )
+
+    # Generate or retain thumbnail
+    thumb_filename = f"thumb_{project_id}.jpg"
+    thumb_path = os.path.join(settings.MEDIA_STORAGE_DIR, "thumbnails", thumb_filename)
+    try:
+        ffmpeg_service.generate_thumbnail(dest_path, thumb_path, timestamp=min(2.0, duration * 0.1))
+        thumb_url = f"/media/thumbnails/{thumb_filename}"
+    except Exception:
+        thumb_url = download_res.get("thumbnail_url") or f"/media/thumbnails/{thumb_filename}"
+
+    proj_name = payload.name or download_res["title"]
+
+    conn = get_db_connection()
+    with conn:
+        conn.execute("""
+            INSERT INTO projects (
+                id, user_id, name, description, category, status,
+                target_clip_count, preferred_duration_seconds, tags,
+                clip_count, metadata, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '["YouTube", "Shorts"]', 0, ?, datetime('now'), datetime('now'));
+        """, (
+            project_id,
+            user_id,
+            proj_name,
+            f"Imported from YouTube: {payload.youtube_url} ({round(duration, 1)}s)",
+            payload.category or "automatic",
+            "processing" if payload.auto_generate_shorts else "ready",
+            payload.target_clip_count or 5,
+            payload.preferred_duration_seconds or 30,
+            json.dumps({
+                "source_type": "youtube",
+                "youtube_url": payload.youtube_url,
+                "youtube_id": video_id,
+                "channel_title": download_res.get("channel_title", "YouTube Creator"),
+                "source_filename": os.path.basename(dest_path),
+                "source_duration": duration,
+                "source_size_mb": round(os.path.getsize(dest_path) / (1024 * 1024), 1) if os.path.exists(dest_path) else 0,
+                "resolution": f"{probe.get('width', 1280)}x{probe.get('height', 720)}",
+                "fps": probe.get("fps", 30),
+                "thumbnail_url": thumb_url,
+                "storage_path": dest_path
+            })
+        ))
+
+        # Store source_videos record
+        source_id = f"src_{project_id[:8]}"
+        conn.execute("""
+            INSERT INTO source_videos (
+                id, project_id, original_filename, storage_path,
+                file_size_bytes, duration_seconds, resolution_width, resolution_height,
+                aspect_ratio, fps, mime_type, thumbnail_url, audio_codec, audio_sample_rate,
+                transcription_status, ai_metadata, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'), datetime('now'));
+        """, (
+            source_id,
+            project_id,
+            os.path.basename(dest_path),
+            dest_path,
+            os.path.getsize(dest_path) if os.path.exists(dest_path) else 0,
+            duration,
+            probe.get("width", 1280),
+            probe.get("height", 720),
+            probe.get("aspect_ratio", "16:9"),
+            probe.get("fps", 30),
+            "video/mp4",
+            thumb_url,
+            probe.get("audio_codec", "aac"),
+            probe.get("audio_sample_rate", 44100),
+            json.dumps(probe)
+        ))
+    conn.close()
+
+    job_id = None
+    if payload.auto_generate_shorts:
+        job = analysis_manager.create_job(
+            project_id=project_id,
+            target_clip_count=payload.target_clip_count or 5,
+            preferred_duration=payload.preferred_duration_seconds or 30,
+            category=payload.category or "automatic",
+            options={
+                "video_path": dest_path,
+                "min_duration": 15.0,
+                "max_duration": 60.0,
+                "content_priority": "balanced",
+                "min_quality_score": 60,
+                "include_similar": False,
+                "source_url": payload.youtube_url
+            }
+        )
+        job_id = job["id"]
+
+        thread = threading.Thread(
+            target=analysis_manager.run_analysis_pipeline,
+            kwargs={
+                "job_id": job_id,
+                "video_path": dest_path,
+                "project_id": project_id,
+                "target_clip_count": payload.target_clip_count or 5,
+                "preferred_duration": payload.preferred_duration_seconds or 30,
+                "category": payload.category or "automatic",
+                "min_duration": 15.0,
+                "max_duration": 60.0,
+                "min_quality_score": 60,
+                "content_priority": "balanced",
+                "include_similar": False
+            },
+            daemon=True
+        )
+        thread.start()
+
+    return {
+        "status": "processing" if payload.auto_generate_shorts else "imported",
+        "project_id": project_id,
+        "job_id": job_id,
+        "source_video_id": source_id,
+        "title": proj_name,
+        "channel_title": download_res.get("channel_title", "YouTube Creator"),
+        "thumbnail_url": thumb_url,
+        "duration": duration,
+        "auto_generating": payload.auto_generate_shorts
     }
 
 @router.get("/{project_id}", response_model=ProjectResponse)

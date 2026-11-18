@@ -51,10 +51,10 @@ function LoginForm() {
   };
 
   const handleDemoSignIn = async () => {
-    setEmail("alex.vance@creatorstudio.io");
+    setEmail("adhrit@shortsfactory.io");
     setPassword("CreatorPro2026!");
     setLoading(true);
-    const res = await login("alex.vance@creatorstudio.io", "CreatorPro2026!");
+    const res = await login("adhrit@shortsfactory.io", "CreatorPro2026!");
     setLoading(false);
     if (res.success) {
       router.push(redirectPath);
@@ -200,7 +200,7 @@ function LoginForm() {
             type="button"
             onClick={async () => {
               setLoading(true);
-              const res = await login("alex.vance@creatorstudio.io", "CreatorPro2026!");
+              const res = await login("adhrit@shortsfactory.io", "CreatorPro2026!");
               setLoading(false);
               if (res.success) router.push(redirectPath);
             }}

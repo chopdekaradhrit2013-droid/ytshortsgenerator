@@ -202,6 +202,15 @@ def login_user(email: str, password: str) -> Tuple[bool, str, Optional[Dict[str,
             WHERE u.email = ?;
         """, (email_clean,)).fetchone()
 
+        if not user and email_clean in ("alex.vance@creatorstudio.io", "creator@aishortsfactory.com"):
+            user = conn.execute("""
+                SELECT u.*, s.plan_id, s.status as sub_status, p.name as plan_name, p.slug as plan_slug
+                FROM users u
+                LEFT JOIN user_subscriptions s ON s.user_id = u.id
+                LEFT JOIN subscription_plans p ON p.id = s.plan_id
+                WHERE u.id = 'usr_default_alex';
+            """).fetchone()
+
         if not user:
             return False, "No account found with this email address.", None
 

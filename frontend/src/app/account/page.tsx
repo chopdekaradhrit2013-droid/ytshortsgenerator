@@ -137,7 +137,7 @@ export default function AccountDashboardPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-bold text-white tracking-tight">
-                {user?.full_name || "Alex Vance"}
+                {user?.full_name || "Adhrit Chopdekar"}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30">
                 {planName}
@@ -151,9 +151,9 @@ export default function AccountDashboardPage() {
               </span>
             </div>
             <p className="text-xs text-gray-400 flex items-center gap-2">
-              <span>@{user?.username || 'alexvance'}</span>
+              <span>@{user?.username || 'adhrit'}</span>
               <span>•</span>
-              <span>{user?.email || 'alex.vance@creatorstudio.io'}</span>
+              <span>{user?.email || 'adhrit@shortsfactory.io'}</span>
             </p>
           </div>
         </div>

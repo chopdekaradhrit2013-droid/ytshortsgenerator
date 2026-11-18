@@ -250,9 +250,9 @@ const INITIAL_JOBS: PublishingJob[] = [
 
 const INITIAL_SETTINGS: AppSettings = {
   profile: {
-    name: "Alex Vance",
-    email: "alex.vance@creatorstudio.io",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    name: "Adhrit Chopdekar",
+    email: "adhrit@shortsfactory.io",
+    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
     role: "Creator Pro Plan",
     storage_used_bytes: 5410000000,
     storage_limit_bytes: 10737418240
@@ -381,10 +381,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Prompt 13: SaaS Multi-User Auth, Subscriptions & Usage States
   const [user, setUser] = useState<AuthUser | null>({
     id: "usr_default_alex",
-    email: "alex.vance@creatorstudio.io",
-    full_name: "Alex Vance",
-    username: "alexvance",
-    avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    email: "adhrit@shortsfactory.io",
+    full_name: "Adhrit Chopdekar",
+    username: "adhrit",
+    avatar_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
     is_verified: true,
     role: "creator",
     plan_id: "plan_pro",
@@ -485,10 +485,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Revert to demo mode
     setUser({
       id: "usr_default_alex",
-      email: "alex.vance@creatorstudio.io",
-      full_name: "Alex Vance",
-      username: "alexvance",
-      avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      email: "adhrit@shortsfactory.io",
+      full_name: "Adhrit Chopdekar",
+      username: "adhrit",
+      avatar_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
       is_verified: true,
       role: "creator",
       plan_id: "plan_pro",

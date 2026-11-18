@@ -218,10 +218,10 @@ export default function Navbar() {
             className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-[#161A26] hover:bg-[#1E2333] border border-[#23293A] transition-colors"
           >
             <span className="text-xs font-semibold text-white max-w-[100px] truncate hidden sm:inline-block">
-              {user?.full_name?.split(' ')[0] || 'Alex'}
+              {user?.full_name?.split(' ')[0] || 'Adhrit'}
             </span>
             <img
-              src={user?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
+              src={user?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"}
               alt="User Avatar"
               className="w-7 h-7 rounded-lg object-cover border border-purple-500/40"
             />

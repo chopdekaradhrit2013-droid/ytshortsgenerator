@@ -1182,7 +1182,7 @@ export default function StudioPage() {
                   type="text"
                   value={newPresetName}
                   onChange={(e) => setNewPresetName(e.target.value)}
-                  placeholder="e.g. Alex Viral High-Contrast"
+                  placeholder="e.g. My Viral High-Contrast"
                   className="w-full px-3 py-2 bg-[#0A0C14] border border-[#262C40] rounded-xl text-xs text-white"
                 />
               </div>

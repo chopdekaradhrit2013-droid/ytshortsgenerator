@@ -108,7 +108,7 @@ const RANKING_BADGES_CONFIG: Record<string, { label: string; color: string; icon
 function GeneratorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const projectIdParam = searchParams.get('project');
+  const projectIdParam = searchParams.get('project') || searchParams.get('project_id');
   const jobIdParam = searchParams.get('job_id');
 
   const {

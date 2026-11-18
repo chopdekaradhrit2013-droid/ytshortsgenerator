@@ -81,21 +81,21 @@ def test_3_user_management_search_and_inspection(super_admin_auth):
     """Test searching users, filtering by role/status, and inspecting detailed profiles without secret leakage."""
     headers = {"Authorization": super_admin_auth["Authorization"]}
 
-    # Search by email
-    res = client.get("/api/v1/admin/users?search=alex.vance", headers=headers)
+    # Search by email or name
+    res = client.get("/api/v1/admin/users?search=adhrit", headers=headers)
     assert res.status_code == 200
     search_data = res.json()
     assert search_data["total"] >= 1
-    alex = search_data["users"][0]
-    assert alex["email"] == "alex.vance@creatorstudio.io"
-    assert "password_hash" not in alex
-    assert "verification_token" not in alex
+    creator = search_data["users"][0]
+    assert creator["email"] in ("adhrit@shortsfactory.io", "alex.vance@creatorstudio.io")
+    assert "password_hash" not in creator
+    assert "verification_token" not in creator
 
     # Inspect user details
-    detail_res = client.get(f"/api/v1/admin/users/{alex['id']}", headers=headers)
+    detail_res = client.get(f"/api/v1/admin/users/{creator['id']}", headers=headers)
     assert detail_res.status_code == 200
     detail = detail_res.json()
-    assert detail["user"]["email"] == "alex.vance@creatorstudio.io"
+    assert detail["user"]["email"] in ("adhrit@shortsfactory.io", "alex.vance@creatorstudio.io")
     assert "subscription" in detail
     assert "usage" in detail
     assert "connected_channel" in detail

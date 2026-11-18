@@ -1,7 +1,8 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Plus,
@@ -21,19 +22,29 @@ import {
   ExternalLink,
   CheckSquare,
   BarChart3,
-  BrainCircuit
+  BrainCircuit,
+  Loader2
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { resolveMediaUrl } from '@/lib/api';
+import { resolveMediaUrl, API_BASE_URL } from '@/lib/api';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const {
     projects,
     clips,
     publishingJobs,
     setActiveProject,
-    setActiveClip
+    setActiveClip,
+    addNotification
   } = useApp();
+
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [targetClipCount, setTargetClipCount] = useState<number>(5);
+  const [preferredDuration, setPreferredDuration] = useState<number>(30);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importStatus, setImportStatus] = useState<string>("");
+  const [importError, setImportError] = useState<string | null>(null);
 
   const totalProjects = projects.length;
   const totalClips = clips.length;
@@ -42,6 +53,52 @@ export default function DashboardPage() {
 
   const recentProjects = projects.slice(0, 3);
   const recentClips = clips.slice(0, 4);
+
+  const handleImportYouTube = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedUrl = youtubeUrl.trim();
+    if (!trimmedUrl) return;
+
+    setIsImporting(true);
+    setImportError(null);
+    setImportStatus("Connecting to YouTube stream & fetching metadata...");
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/projects/import-youtube`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          youtube_url: trimmedUrl,
+          target_clip_count: targetClipCount,
+          preferred_duration_seconds: preferredDuration,
+          auto_generate_shorts: true
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to process YouTube link. Please verify the URL.");
+      }
+
+      const data = await res.json();
+      setImportStatus("Video processed! Launching AI Clip Hunter pipeline...");
+      addNotification(
+        "YouTube Video Imported",
+        `Generating vertical Shorts from "${data.title}"...`,
+        "success"
+      );
+
+      // Auto-route straight into AI Short Hunter where the pipeline runs and clips populate
+      setTimeout(() => {
+        router.push(`/generator?project_id=${data.project_id}&job_id=${data.job_id}`);
+      }, 600);
+
+    } catch (err: any) {
+      setImportError(err.message || "An unexpected error occurred while importing video.");
+      setIsImporting(false);
+      setImportStatus("");
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -67,6 +124,87 @@ export default function DashboardPage() {
           <p className="text-gray-300 text-base md:text-lg max-w-2xl font-normal leading-relaxed">
             Your personal AI-powered video production studio. Automatically isolate high-retention moments, apply Hormozi-style captions, edit in a dedicated Studio, and publish directly to YouTube.
           </p>
+
+          {/* ONE-CLICK YOUTUBE LINK TO SHORTS GENERATOR */}
+          <div className="pt-2 pb-2">
+            <form onSubmit={handleImportYouTube} className="space-y-3">
+              <div className="relative flex flex-col md:flex-row items-stretch gap-2.5 p-2 rounded-2xl bg-[#0D1019]/90 border border-purple-500/40 shadow-inner focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-500/20 transition-all">
+                <div className="flex items-center gap-2.5 pl-3 flex-1 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                    <Play className="w-4 h-4 fill-current" />
+                  </div>
+                  <input
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) => {
+                      setYoutubeUrl(e.target.value);
+                      if (importError) setImportError(null);
+                    }}
+                    placeholder="Paste YouTube video link (e.g. https://www.youtube.com/watch?v=... or shorts link)..."
+                    disabled={isImporting}
+                    className="w-full bg-transparent border-none text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-0"
+                  />
+                  {youtubeUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setYoutubeUrl('')}
+                      disabled={isImporting}
+                      className="text-gray-500 hover:text-gray-300 px-2 text-sm font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <select
+                    value={targetClipCount}
+                    onChange={(e) => setTargetClipCount(Number(e.target.value))}
+                    disabled={isImporting}
+                    className="px-3 py-2.5 rounded-xl bg-[#161B29] border border-[#272F44] text-xs font-semibold text-gray-300 focus:outline-none cursor-pointer"
+                    title="Number of clips to generate"
+                  >
+                    <option value={3}>3 Shorts</option>
+                    <option value={5}>5 Shorts</option>
+                    <option value={8}>8 Shorts</option>
+                    <option value={10}>10 Shorts</option>
+                  </select>
+
+                  <button
+                    type="submit"
+                    disabled={isImporting || !youtubeUrl.trim()}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-purple-600 to-indigo-600 hover:from-red-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-2 shadow-glow-purple transition-all active:scale-95 shrink-0"
+                  >
+                    {isImporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>Auto-Generate Shorts</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {importError && (
+                <div className="flex items-center gap-2 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{importError}</span>
+                </div>
+              )}
+
+              {isImporting && (
+                <div className="flex items-center gap-2 text-xs text-purple-300 bg-purple-500/10 border border-purple-500/20 px-3.5 py-2.5 rounded-xl animate-pulse">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400 shrink-0" />
+                  <span>{importStatus} Automatically launching AI Highlight Hunter...</span>
+                </div>
+              )}
+            </form>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link

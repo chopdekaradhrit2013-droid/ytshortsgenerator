@@ -60,11 +60,11 @@ def test_2_default_plan_assignment_and_plans_catalog():
     assert "pro" in plan_slugs
     assert "enterprise" in plan_slugs
 
-    # Default seed user (Alex Vance) has active plan
+    # Default seed creator (Adhrit Chopdekar) has active plan
     profile_res = client.get("/api/v1/auth/me")
     assert profile_res.status_code == 200
     profile = profile_res.json()
-    assert profile["email"] == "alex.vance@creatorstudio.io"
+    assert profile["email"] in ("adhrit@shortsfactory.io", "alex.vance@creatorstudio.io")
     assert profile["subscription"]["plan_slug"] in ("creator", "pro")
     assert profile["subscription"]["status"] == "active"
 

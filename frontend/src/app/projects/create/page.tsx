@@ -19,11 +19,15 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { VideoCategory } from '@/types';
-import { uploadProjectVideo, startAnalysis } from '@/lib/api';
+import { uploadProjectVideo, startAnalysis, API_BASE_URL } from '@/lib/api';
 
 export default function CreateProjectPage() {
   const router = useRouter();
   const { addProject, addNotification } = useApp();
+
+  // Ingestion Mode
+  const [importMode, setImportMode] = useState<'youtube' | 'file'>('youtube');
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   // Form states
   const [projectName, setProjectName] = useState("");
@@ -96,6 +100,70 @@ export default function CreateProjectPage() {
   };
 
   const handleCreateProject = async () => {
+    setValidationError(null);
+    const targetCount = clipCountOption === "custom" ? customClipCount : parseInt(clipCountOption);
+
+    if (importMode === 'youtube') {
+      const trimmedUrl = youtubeUrl.trim();
+      if (!trimmedUrl) {
+        setValidationError("Please paste a valid YouTube video link to continue.");
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress(20);
+      addNotification("Connecting to YouTube", "Downloading video stream & analyzing audio...", "info");
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/projects/import-youtube`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            youtube_url: trimmedUrl,
+            name: projectName || undefined,
+            category,
+            target_clip_count: targetCount,
+            preferred_duration_seconds: preferredDuration,
+            auto_generate_shorts: true
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || "Failed to process YouTube link.");
+        }
+
+        const data = await res.json();
+        setUploadProgress(80);
+        addNotification("YouTube Video Imported", `Auto-generating shorts for "${data.title}"...`, "success");
+
+        // Add to AppContext
+        addProject({
+          id: data.project_id,
+          name: data.title || projectName || "YouTube Shorts Project",
+          category,
+          status: "analysing",
+          target_clip_count: targetCount,
+          preferred_duration_seconds: preferredDuration,
+          source_filename: `youtube_${data.project_id}.mp4`,
+          source_file_size_mb: 50,
+          source_duration_seconds: data.duration,
+          thumbnail_url: data.thumbnail_url,
+          tags: [category, "YouTube", "Shorts"],
+        });
+
+        setUploadProgress(100);
+        setIsUploading(false);
+        router.push(`/generator?project_id=${data.project_id}&job_id=${data.job_id}`);
+        return;
+      } catch (err: any) {
+        setIsUploading(false);
+        setValidationError(`YouTube import error: ${err.message || "Failed to download YouTube video"}`);
+        addNotification("Import Failed", err.message || "Error fetching YouTube video", "warning");
+        return;
+      }
+    }
+
     if (!file && !previewUrl) {
       setValidationError("Please select or drop a source video to continue.");
       return;
@@ -103,7 +171,6 @@ export default function CreateProjectPage() {
 
     setIsUploading(true);
     setUploadProgress(10);
-    const targetCount = clipCountOption === "custom" ? customClipCount : parseInt(clipCountOption);
 
     try {
       if (file instanceof File) {
@@ -253,13 +320,89 @@ export default function CreateProjectPage() {
             />
           </div>
 
-          {/* 2. DRAG AND DROP SOURCE UPLOAD */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-              Source Video Upload
-            </label>
+          {/* 2. SOURCE VIDEO INGESTION */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                Source Video Ingestion
+              </label>
+              <div className="flex items-center gap-1.5 p-1 bg-[#0E111A] rounded-xl border border-[#23293A]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMode('youtube');
+                    setValidationError(null);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    importMode === 'youtube'
+                      ? 'bg-gradient-to-r from-red-600 to-purple-600 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  <Play className="w-3 h-3 fill-current" />
+                  <span>YouTube Link</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportMode('file');
+                    setValidationError(null);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    importMode === 'file'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  <UploadCloud className="w-3 h-3" />
+                  <span>Upload File</span>
+                </button>
+              </div>
+            </div>
 
-            {!file && !previewUrl ? (
+            {importMode === 'youtube' ? (
+              <div className="p-6 rounded-2xl bg-[#12151E] border border-purple-500/30 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+                    <Play className="w-6 h-6 fill-current" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Import Video Directly from YouTube</h3>
+                    <p className="text-xs text-gray-400">
+                      Paste any public YouTube watch link or Shorts link. We'll automatically download, isolate hooks, and create Shorts.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="relative">
+                    <input
+                      type="url"
+                      value={youtubeUrl}
+                      onChange={(e) => {
+                        setYoutubeUrl(e.target.value);
+                        if (validationError) setValidationError(null);
+                      }}
+                      placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                      className="w-full pl-4 pr-10 py-3 rounded-xl bg-[#0B0D14] border border-[#23293A] text-white text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 placeholder:text-gray-600"
+                    />
+                    {youtubeUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setYoutubeUrl('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                    <span>Supports Standard Videos, Podcasts & Live Stream Archives</span>
+                    <span className="text-purple-400 font-semibold">1080p / 720p HD Stream</span>
+                  </div>
+                </div>
+              </div>
+            ) : !file && !previewUrl ? (
               <div
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
@@ -481,7 +624,7 @@ export default function CreateProjectPage() {
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isUploading ? "Uploading & Initializing..." : "Create Project & Generate"}</span>
+              <span>{isUploading ? (importMode === 'youtube' ? "Importing & Generating Shorts..." : "Uploading & Initializing...") : "Create Project & Generate Shorts"}</span>
             </button>
           </div>
 
