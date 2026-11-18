@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { ProjectStatus, Project } from '@/types';
+import { resolveMediaUrl } from '@/lib/api';
 
 export default function MyProjectsPage() {
   const {
@@ -206,7 +207,7 @@ export default function MyProjectsPage() {
                 {/* VIDEO THUMBNAIL */}
                 <div className="relative rounded-xl overflow-hidden aspect-video bg-black border border-white/5 mb-3 group/thumb">
                   <img
-                    src={proj.thumbnail_url}
+                    src={resolveMediaUrl(proj.thumbnail_url)}
                     alt={proj.name}
                     className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                   />
@@ -288,7 +289,7 @@ export default function MyProjectsPage() {
               <div className="flex items-center gap-4 min-w-0">
                 <div className="w-24 h-14 rounded-lg overflow-hidden bg-black flex-shrink-0 relative border border-white/5">
                   <img
-                    src={proj.thumbnail_url}
+                    src={resolveMediaUrl(proj.thumbnail_url)}
                     alt={proj.name}
                     className="w-full h-full object-cover"
                   />
@@ -349,3 +350,4 @@ export default function MyProjectsPage() {
     </div>
   );
 }
+

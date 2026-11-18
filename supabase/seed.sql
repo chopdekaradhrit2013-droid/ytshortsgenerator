@@ -70,3 +70,4 @@ INSERT INTO public.projects (
     50,
     ARRAY['CreatorEconomy', 'YouTubeShorts', 'Growth']
 ) ON CONFLICT DO NOTHING;
+

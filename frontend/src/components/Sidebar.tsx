@@ -16,7 +16,16 @@ import {
   ChevronRight,
   Radio,
   CheckCircle2,
-  Film
+  Film,
+  CheckSquare,
+  BarChart3,
+  BrainCircuit,
+  Image as ImageIcon,
+  User,
+  CreditCard,
+  LogOut,
+  Zap,
+  ShieldAlert
 } from 'lucide-react';
 import YoutubeIcon from '@/components/YoutubeIcon';
 import { useApp } from '@/context/AppContext';
@@ -28,7 +37,10 @@ export default function Sidebar() {
     setSidebarCollapsed,
     connectedChannel,
     toggleChannelConnection,
-    settings
+    settings,
+    user,
+    subscription,
+    logout
   } = useApp();
 
   const navItems = [
@@ -36,11 +48,25 @@ export default function Sidebar() {
     { name: "Create Project", href: "/projects/create", icon: PlusCircle, highlight: true },
     { name: "My Projects", href: "/projects", icon: FolderKanban },
     { name: "AI Clip Generator", href: "/generator", icon: Sparkles },
+    { name: "Review Studio", href: "/review", icon: CheckSquare, badge: "Review" },
     { name: "Studio", href: "/studio", icon: Scissors, badge: "Editor" },
+    { name: "Thumbnails", href: "/thumbnails", icon: ImageIcon, badge: "Design" },
     { name: "Publishing Centre", href: "/publishing", icon: Share2 },
+    { name: "Analytics & Insights", href: "/analytics", icon: BarChart3, badge: "Live" },
+    { name: "Content Intelligence", href: "/intelligence", icon: BrainCircuit, badge: "AI Hub" },
+    { name: "Account Dashboard", href: "/account", icon: User, badge: "SaaS" },
+    { name: "Pricing & Plans", href: "/pricing", icon: Sparkles, badge: "Upgrade" },
+    { name: "Billing & Invoices", href: "/billing", icon: CreditCard },
     { name: "Upload History", href: "/history", icon: History },
     { name: "Settings", href: "/settings", icon: Settings },
+    ...(user && ['super_admin', 'admin', 'support_agent'].includes(user.role)
+      ? [{ name: "Super Admin", href: "/admin", icon: ShieldAlert, badge: "Staff" }]
+      : [])
   ];
+
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <aside
@@ -194,27 +220,37 @@ export default function Sidebar() {
 
         {/* USER PROFILE */}
         {!sidebarCollapsed ? (
-          <div className="flex items-center justify-between px-2 py-1">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-xl bg-[#131722] border border-[#222838] group">
+            <Link href="/account" className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-90 transition-opacity">
               <img
-                src={settings.profile.avatar}
-                alt={settings.profile.name}
+                src={user?.avatar_url || settings.profile.avatar}
+                alt={user?.full_name || settings.profile.name}
                 className="w-8 h-8 rounded-full object-cover ring-2 ring-purple-500/30"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-white truncate">{settings.profile.name}</p>
-                <p className="text-[11px] text-purple-400 truncate">{settings.profile.role}</p>
+                <p className="text-xs font-semibold text-white truncate">{user?.full_name || settings.profile.name}</p>
+                <p className="text-[10px] text-purple-400 font-bold uppercase truncate">{subscription?.plan_name || user?.plan_name || "Creator Pro"}</p>
               </div>
-            </div>
+            </Link>
+
+            <button
+              onClick={logout}
+              className="p-1 text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         ) : (
           <div className="flex justify-center">
-            <img
-              src={settings.profile.avatar}
-              alt={settings.profile.name}
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-purple-500/30"
-              title={`${settings.profile.name} (${settings.profile.role})`}
-            />
+            <Link href="/account">
+              <img
+                src={user?.avatar_url || settings.profile.avatar}
+                alt={user?.full_name || settings.profile.name}
+                className="w-8 h-8 rounded-full object-cover ring-2 ring-purple-500/30 hover:scale-105 transition-transform"
+                title={`${user?.full_name || settings.profile.name} (${user?.plan_name || "Creator Pro"})`}
+              />
+            </Link>
           </div>
         )}
 

@@ -18,3 +18,4 @@ def get_supabase_client():
             print(f"Warning: Failed to initialize Supabase client: {e}")
             return None
     return None
+

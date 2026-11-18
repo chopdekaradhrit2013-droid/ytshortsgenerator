@@ -12,7 +12,8 @@ import {
   FolderOpen,
   Check,
   X,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
@@ -24,11 +25,15 @@ export default function Navbar() {
     activeProject,
     setActiveProject,
     notifications,
-    dismissNotification
+    dismissNotification,
+    user,
+    subscription,
+    logout
   } = useApp();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // Get current page title and breadcrumbs
   const getHeaderInfo = () => {
@@ -36,14 +41,30 @@ export default function Navbar() {
     if (pathname.startsWith('/projects/create')) return { title: "Create Project", category: "Workspace" };
     if (pathname.startsWith('/projects')) return { title: "My Projects", category: "Workspace" };
     if (pathname.startsWith('/generator')) return { title: "AI Clip Generator", category: "AI Studio" };
+    if (pathname.startsWith('/review')) return { title: "Review Studio", category: "Review & Polish" };
     if (pathname.startsWith('/studio')) return { title: "Editing Studio", category: "Timeline Editor" };
+    if (pathname.startsWith('/thumbnails')) return { title: "Thumbnail Studio", category: "Visual Packaging" };
     if (pathname.startsWith('/publishing')) return { title: "Publishing Centre", category: "Distribution" };
+    if (pathname.startsWith('/analytics')) return { title: "Performance Analytics", category: "Channel Intelligence" };
+    if (pathname.startsWith('/intelligence')) return { title: "Content Strategy & Niche", category: "Channel Intelligence" };
+    if (pathname.startsWith('/account')) return { title: "Account & Quota", category: "SaaS Management" };
+    if (pathname.startsWith('/pricing')) return { title: "Pricing & Plans", category: "Subscription" };
+    if (pathname.startsWith('/billing')) return { title: "Billing & Invoices", category: "Subscription" };
+    if (pathname.startsWith('/login')) return { title: "Sign In", category: "Authentication" };
+    if (pathname.startsWith('/signup')) return { title: "Create Account", category: "Authentication" };
+    if (pathname.startsWith('/onboarding')) return { title: "Creator Onboarding", category: "Workspace Setup" };
+    if (pathname.startsWith('/verify-email')) return { title: "Verify Email", category: "Authentication" };
     if (pathname.startsWith('/history')) return { title: "Upload History", category: "Distribution" };
+    if (pathname.startsWith('/admin')) return { title: "Super Admin Control", category: "Platform Operations" };
     if (pathname.startsWith('/settings')) return { title: "Settings", category: "Preferences" };
     return { title: "AI Shorts Factory", category: "Studio" };
   };
 
   const headerInfo = getHeaderInfo();
+
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <header
@@ -189,7 +210,85 @@ export default function Navbar() {
         >
           <SlidersHorizontal className="w-4 h-4" />
         </Link>
+
+        {/* USER PROFILE DROPDOWN */}
+        <div className="relative">
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-[#161A26] hover:bg-[#1E2333] border border-[#23293A] transition-colors"
+          >
+            <span className="text-xs font-semibold text-white max-w-[100px] truncate hidden sm:inline-block">
+              {user?.full_name?.split(' ')[0] || 'Alex'}
+            </span>
+            <img
+              src={user?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
+              alt="User Avatar"
+              className="w-7 h-7 rounded-lg object-cover border border-purple-500/40"
+            />
+          </button>
+
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#161A26] border border-[#262C3E] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 space-y-1">
+              <div className="p-2.5 pb-2 border-b border-[#242A3D]">
+                <p className="text-xs font-bold text-white truncate">{user?.full_name}</p>
+                <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
+                <div className="mt-1.5 inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {subscription?.plan_name || user?.plan_name || 'Creator Pro'}
+                </div>
+              </div>
+
+              <Link
+                href="/account"
+                onClick={() => setShowUserMenu(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-300 hover:text-white hover:bg-[#1F2538] transition-colors"
+              >
+                <span>Account Dashboard</span>
+              </Link>
+
+              {user && ['super_admin', 'admin', 'support_agent'].includes(user.role) && (
+                <Link
+                  href="/admin"
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-amber-300 font-bold hover:text-white hover:bg-amber-500/20 transition-colors"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Admin Control Center</span>
+                </Link>
+              )}
+
+              <Link
+                href="/billing"
+                onClick={() => setShowUserMenu(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-300 hover:text-white hover:bg-[#1F2538] transition-colors"
+              >
+                <span>Billing & Invoices</span>
+              </Link>
+
+              <Link
+                href="/pricing"
+                onClick={() => setShowUserMenu(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-purple-300 hover:text-white hover:bg-purple-600/20 transition-colors"
+              >
+                <span>Upgrade Plan</span>
+              </Link>
+
+              <div className="pt-1 border-t border-[#242A3D]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    logout();
+                  }}
+                  className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
+                >
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
 }
+

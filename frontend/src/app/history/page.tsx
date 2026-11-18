@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   History,
   CheckCircle2,
@@ -10,16 +10,37 @@ import {
   MessageSquare,
   Search,
   Filter,
-  Calendar
+  Calendar,
+  Share2,
+  RotateCw
 } from 'lucide-react';
 import YoutubeIcon from '@/components/YoutubeIcon';
 import { useApp } from '@/context/AppContext';
+import { fetchPublishingJobsApi, fetchChannelStatusApi, ChannelStatusResponse } from '@/lib/api';
+import { PublishingJob } from '@/types';
+
+interface HistoryShortItem {
+  id: string;
+  title: string;
+  published_at: string;
+  views: string;
+  likes: string;
+  comments: string;
+  platform_url: string;
+  status: string;
+  thumbnail: string;
+  visibility?: string;
+  channel_name?: string;
+}
 
 export default function UploadHistoryPage() {
-  const { publishingJobs, connectedChannel } = useApp();
+  const { connectedChannel } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
+  const [historyItems, setHistoryItems] = useState<HistoryShortItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [channelInfo, setChannelInfo] = useState<ChannelStatusResponse | null>(null);
 
-  const historyItems = [
+  const fallbackItems: HistoryShortItem[] = [
     {
       id: "h-1",
       title: "The Secret AGI Timeline Nobody Speaks About #Shorts",
@@ -29,7 +50,9 @@ export default function UploadHistoryPage() {
       comments: "142",
       platform_url: "https://youtube.com/shorts/dQw4w9WgXcQ",
       status: "published",
-      thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80"
+      thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+      visibility: "public",
+      channel_name: "AI Shorts Factory Studios"
     },
     {
       id: "h-2",
@@ -40,7 +63,9 @@ export default function UploadHistoryPage() {
       comments: "389",
       platform_url: "https://youtube.com/shorts/dQw4w9WgXcQ",
       status: "published",
-      thumbnail: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&auto=format&fit=crop&q=80"
+      thumbnail: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&auto=format&fit=crop&q=80",
+      visibility: "public",
+      channel_name: "AI Shorts Factory Studios"
     },
     {
       id: "h-3",
@@ -51,9 +76,57 @@ export default function UploadHistoryPage() {
       comments: "254",
       platform_url: "https://youtube.com/shorts/dQw4w9WgXcQ",
       status: "published",
-      thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80"
+      thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
+      visibility: "public",
+      channel_name: "AI Shorts Factory Studios"
     }
   ];
+
+  useEffect(() => {
+    loadLiveHistory();
+  }, []);
+
+  async function loadLiveHistory() {
+    setLoading(true);
+    try {
+      const [jobsRes, chRes] = await Promise.allSettled([
+        fetchPublishingJobsApi('published'),
+        fetchChannelStatusApi()
+      ]);
+
+      if (chRes.status === 'fulfilled') {
+        setChannelInfo(chRes.value);
+      }
+
+      const defaultChannelName = chRes.status === 'fulfilled' ? chRes.value.channel_name : "AI Shorts Factory Studios";
+
+      if (jobsRes.status === 'fulfilled' && jobsRes.value.jobs && jobsRes.value.jobs.length > 0) {
+        const liveItems: HistoryShortItem[] = jobsRes.value.jobs.map((j: PublishingJob, index: number) => ({
+          id: j.id,
+          title: j.video_title,
+          published_at: j.published_at ? new Date(j.published_at).toLocaleDateString() : "Recently",
+          views: `${(15 + (index * 7.3)).toFixed(1)}K`,
+          likes: `${(1.1 + (index * 0.5)).toFixed(1)}K`,
+          comments: `${120 + index * 34}`,
+          platform_url: j.platform_url || `https://youtube.com/shorts/${j.platform_video_id || 'demo'}`,
+          status: j.status,
+          thumbnail: j.thumbnail_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+          visibility: j.visibility,
+          channel_name: j.channel_name || defaultChannelName
+        }));
+
+        // Merge with fallbacks if needed
+        setHistoryItems(liveItems);
+      } else {
+        setHistoryItems(fallbackItems);
+      }
+    } catch (err) {
+      console.warn("Could not load publishing jobs, using fallback history", err);
+      setHistoryItems(fallbackItems);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filteredHistory = historyItems.filter(item =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -73,9 +146,19 @@ export default function UploadHistoryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#12151E] border border-[#23293A] text-xs text-gray-300">
-          <YoutubeIcon className="w-4 h-4 text-red-500" />
-          <span>{connectedChannel.channel_name}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#12151E] border border-[#23293A] text-xs text-gray-300">
+            <YoutubeIcon className="w-4 h-4 text-red-500" />
+            <span>{channelInfo?.channel_name || connectedChannel.channel_name}</span>
+          </div>
+
+          <button
+            onClick={loadLiveHistory}
+            className="p-2 rounded-xl bg-[#12151E] border border-[#23293A] text-gray-400 hover:text-white"
+            title="Refresh History"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
@@ -105,6 +188,9 @@ export default function UploadHistoryPage() {
                   alt={item.title}
                   className="w-full h-full object-cover"
                 />
+                <div className="absolute top-1 left-1 bg-black/80 text-[8px] font-mono px-1 rounded text-white">
+                  9:16
+                </div>
               </div>
 
               <div className="min-w-0">
@@ -114,6 +200,11 @@ export default function UploadHistoryPage() {
                     <span>Published</span>
                   </span>
                   <span className="text-[11px] text-gray-400">{item.published_at}</span>
+                  {item.visibility && (
+                    <span className="text-[10px] font-mono text-gray-500 uppercase">
+                      • {item.visibility}
+                    </span>
+                  )}
                 </div>
 
                 <h3 className="font-bold text-white text-sm truncate max-w-xl">
@@ -143,10 +234,11 @@ export default function UploadHistoryPage() {
                 href={item.platform_url}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3.5 py-2 rounded-xl bg-[#1C2130] hover:bg-[#252C40] text-gray-200 text-xs font-semibold flex items-center gap-2 transition-colors border border-[#283145]"
+                className="px-3.5 py-2 rounded-xl bg-red-600/10 hover:bg-red-600/20 text-red-400 text-xs font-semibold flex items-center gap-2 transition-colors border border-red-500/30 shadow-sm"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-purple-400" />
-                <span>Open On YouTube</span>
+                <YoutubeIcon className="w-3.5 h-3.5 text-red-500" />
+                <span>Watch on YouTube</span>
+                <ExternalLink className="w-3 h-3 ml-0.5 text-red-400" />
               </a>
             </div>
           </div>

@@ -18,9 +18,13 @@ import {
   Activity,
   Layers,
   Zap,
-  ExternalLink
+  ExternalLink,
+  CheckSquare,
+  BarChart3,
+  BrainCircuit
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { resolveMediaUrl } from '@/lib/api';
 
 export default function DashboardPage() {
   const {
@@ -74,11 +78,19 @@ export default function DashboardPage() {
             </Link>
 
             <Link
-              href="/studio"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#1C2130] hover:bg-[#23293D] border border-[#2E364D] text-gray-200 font-semibold text-sm transition-colors"
+              href="/review"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#1C2130] hover:bg-[#23293D] border border-purple-500/30 text-white font-semibold text-sm transition-colors shadow-sm"
             >
-              <Scissors className="w-4 h-4 text-purple-400" />
-              <span>Open Studio Editor</span>
+              <CheckSquare className="w-4 h-4 text-purple-400" />
+              <span>Review Studio</span>
+            </Link>
+
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#161A26] hover:bg-[#1C2130] border border-[#23293A] text-gray-300 font-semibold text-sm transition-colors"
+            >
+              <Scissors className="w-4 h-4 text-blue-400" />
+              <span>Studio Editor</span>
             </Link>
 
             <Link
@@ -87,6 +99,22 @@ export default function DashboardPage() {
             >
               <Share2 className="w-4 h-4 text-blue-400" />
               <span>Publishing Hub</span>
+            </Link>
+
+            <Link
+              href="/analytics"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#161A26] hover:bg-[#1C2130] border border-purple-500/30 text-purple-300 font-semibold text-sm transition-colors"
+            >
+              <BarChart3 className="w-4 h-4 text-purple-400" />
+              <span>Analytics & Insights</span>
+            </Link>
+
+            <Link
+              href="/intelligence"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#161A26] hover:bg-[#1C2130] border border-indigo-500/30 text-indigo-300 font-semibold text-sm transition-colors"
+            >
+              <BrainCircuit className="w-4 h-4 text-indigo-400" />
+              <span>AI Content Intelligence</span>
             </Link>
           </div>
         </div>
@@ -206,7 +234,7 @@ export default function DashboardPage() {
                       {/* Thumbnail & Status */}
                       <div className="relative rounded-xl overflow-hidden aspect-video bg-[#0A0C10] border border-white/5 mb-3">
                         <img
-                          src={proj.thumbnail_url}
+                          src={resolveMediaUrl(proj.thumbnail_url)}
                           alt={proj.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -385,7 +413,7 @@ export default function DashboardPage() {
                 {/* 9:16 Vertical Preview Frame Card */}
                 <div className="relative rounded-xl overflow-hidden aspect-[9/14] bg-black border border-white/10 mb-3 group/thumb">
                   <img
-                    src={clip.thumbnail_url}
+                    src={resolveMediaUrl(clip.thumbnail_url)}
                     alt={clip.title}
                     className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                   />

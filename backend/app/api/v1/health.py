@@ -21,3 +21,4 @@ def health_check():
             "celery_broker": settings.CELERY_BROKER_URL.split("@")[-1] if "@" in settings.CELERY_BROKER_URL else settings.CELERY_BROKER_URL
         }
     }
+

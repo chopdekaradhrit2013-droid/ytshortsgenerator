@@ -160,3 +160,4 @@ The database consists of 7 interconnected tables with Row-Level Security enabled
 
 ## 📝 License
 Proprietary & Confidential — Built for personal creator studio use.
+

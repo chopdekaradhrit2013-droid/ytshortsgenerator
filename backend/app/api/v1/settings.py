@@ -76,3 +76,4 @@ def update_settings(payload: Dict[str, Any]):
         else:
             CURRENT_SETTINGS[section] = values
     return {"status": "saved", "settings": CURRENT_SETTINGS}
+

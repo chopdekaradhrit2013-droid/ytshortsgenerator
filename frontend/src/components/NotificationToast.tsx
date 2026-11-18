@@ -14,6 +14,7 @@ export default function NotificationToast() {
       {notifications.map((n) => {
         const isSuccess = n.type === 'success';
         const isWarning = n.type === 'warning';
+        const isError = n.type === 'error';
         
         return (
           <div
@@ -23,6 +24,8 @@ export default function NotificationToast() {
                 ? 'bg-[#121E19]/90 border-emerald-500/40 text-emerald-200'
                 : isWarning
                 ? 'bg-[#211A12]/90 border-amber-500/40 text-amber-200'
+                : isError
+                ? 'bg-[#251214]/90 border-red-500/40 text-red-200'
                 : 'bg-[#161A26]/95 border-purple-500/40 text-purple-200'
             }`}
           >
@@ -31,6 +34,8 @@ export default function NotificationToast() {
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               ) : isWarning ? (
                 <AlertCircle className="w-4 h-4 text-amber-400" />
+              ) : isError ? (
+                <AlertCircle className="w-4 h-4 text-red-400" />
               ) : (
                 <Info className="w-4 h-4 text-purple-400" />
               )}
@@ -53,3 +58,4 @@ export default function NotificationToast() {
     </div>
   );
 }
+

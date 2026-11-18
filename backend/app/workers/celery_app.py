@@ -17,3 +17,4 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=3600, # 1 hour max processing per long video
 )
+

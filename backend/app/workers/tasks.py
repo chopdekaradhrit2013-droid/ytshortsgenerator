@@ -55,3 +55,4 @@ def publish_youtube_batch(self, job_ids: list[str]):
         self.update_state(state="PROGRESS", meta={"current_index": idx, "total": len(job_ids)})
         results.append({"job_id": job_id, "status": "queued"})
     return results
+

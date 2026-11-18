@@ -36,6 +36,25 @@ wheels/
 .env.test.local
 .env.production.local
 
+# Databases & Backups
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backups/
+
+# Media storage, uploads & rendered exports
+media_storage/
+*.mp4
+*.wav
+*.aac
+
+# Test & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
 # OS
 .DS_Store
 Thumbs.db
+

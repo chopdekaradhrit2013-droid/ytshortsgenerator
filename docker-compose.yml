@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # FastAPI Application Server (Ingestion, Whisper, Reframing, Analytics, Publishing)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shorts_factory_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - API_V1_STR=/api/v1
+      - PROJECT_NAME=AI Shorts Factory
+      - DEBUG=False
+      - PORT=8000
+      - DATABASE_PATH=/app/backend/shorts_factory.db
+      - MEDIA_STORAGE_DIR=/app/media_storage
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-shorts_factory_jwt_secret_key_production_2026_xyz987}
+      - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET:-whsec_shorts_factory_production_secret_2026_safe}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET}
+    volumes:
+      - media_data:/app/media_storage
+      - sqlite_data:/app/backend
+      - backup_data:/app/backups
+    depends_on:
+      - redis
+    networks:
+      - shorts_factory_network
+
+  # ----------------------------------------------------------------------------
+  # Celery Background Worker (Asynchronous FFmpeg cuts, AI analysis, rendering)
+  # ----------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shorts_factory_worker
+    restart: unless-stopped
+    command: ["celery", "-A", "backend.app.workers.celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]
+    environment:
+      - DATABASE_PATH=/app/backend/shorts_factory.db
+      - MEDIA_STORAGE_DIR=/app/media_storage
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - media_data:/app/media_storage
+      - sqlite_data:/app/backend
+    depends_on:
+      - redis
+      - backend
+    networks:
+      - shorts_factory_network
+
+  # ----------------------------------------------------------------------------
+  # Redis Cache & Message Broker
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: shorts_factory_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - shorts_factory_network
+
+  # ----------------------------------------------------------------------------
+  # Next.js 14 Production Frontend
+  # ----------------------------------------------------------------------------
+  frontend:
+    image: node:20-alpine
+    container_name: shorts_factory_frontend
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000/api/v1
+      - NODE_ENV=production
+    command: ["npm", "start"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - shorts_factory_network
+
+  # ----------------------------------------------------------------------------
+  # Nginx Reverse Proxy (SSL termination, rate limiting, media file caching)
+  # ----------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: shorts_factory_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - media_data:/var/data/shorts_factory/media_storage:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - shorts_factory_network
+
+volumes:
+  media_data:
+  sqlite_data:
+  backup_data:
+  redis_data:
+
+networks:
+  shorts_factory_network:
+    driver: bridge
+

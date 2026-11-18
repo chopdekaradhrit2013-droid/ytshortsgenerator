@@ -1,10 +1,16 @@
 "use client";
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 
 export default function MainLayoutWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { sidebarCollapsed } = useApp();
+
+  if (pathname.startsWith('/admin')) {
+    return <div className="flex-1 min-h-screen bg-[#07090E]">{children}</div>;
+  }
 
   return (
     <main
@@ -18,3 +24,4 @@ export default function MainLayoutWrapper({ children }: { children: React.ReactN
     </main>
   );
 }
+

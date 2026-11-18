@@ -14,10 +14,12 @@ import {
   Layers,
   ArrowRight,
   X,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { VideoCategory } from '@/types';
+import { uploadProjectVideo, startAnalysis } from '@/lib/api';
 
 export default function CreateProjectPage() {
   const router = useRouter();
@@ -93,47 +95,107 @@ export default function CreateProjectPage() {
     }
   };
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (!file && !previewUrl) {
       setValidationError("Please select or drop a source video to continue.");
       return;
     }
 
     setIsUploading(true);
-    setUploadProgress(15);
+    setUploadProgress(10);
+    const targetCount = clipCountOption === "custom" ? customClipCount : parseInt(clipCountOption);
 
-    // Progressive upload simulation
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return 100;
+    try {
+      if (file instanceof File) {
+        setUploadProgress(30);
+        addNotification(
+          "Ingesting Video",
+          "Uploading file to AI Shorts Factory media pipeline and inspecting codecs with FFprobe...",
+          "info"
+        );
+
+        const uploadRes = await uploadProjectVideo(file, {
+          name: projectName || file.name.replace(/\.[^/.]+$/, ""),
+          category,
+          target_clip_count: targetCount,
+          preferred_duration_seconds: preferredDuration,
+        });
+
+        setUploadProgress(70);
+        addNotification(
+          "Video Ingested",
+          `Detected ${uploadRes.metadata.width}x${uploadRes.metadata.height} (${round(uploadRes.metadata.fps || 30)}fps, ${round(uploadRes.metadata.duration || 0)}s). Starting AI Clip Hunter...`,
+          "success"
+        );
+
+        // Auto-start AI analysis pipeline
+        const analysisRes = await startAnalysis({
+          project_id: uploadRes.project_id,
+          video_path: uploadRes.storage_path,
+          target_clip_count: targetCount,
+          preferred_duration_seconds: preferredDuration,
+          category,
+        });
+
+        // Add to AppContext so local views have the project
+        const newProj = addProject({
+          id: uploadRes.project_id,
+          name: projectName || file.name.replace(/\.[^/.]+$/, ""),
+          category,
+          status: "analysing",
+          target_clip_count: targetCount,
+          preferred_duration_seconds: preferredDuration,
+          source_filename: file.name,
+          source_file_size_mb: Math.round(file.size / (1024 * 1024)),
+          source_duration_seconds: uploadRes.metadata.duration,
+          thumbnail_url: uploadRes.thumbnail_url,
+          tags: [category, "Shorts"],
+        });
+
+        setUploadProgress(100);
+        setIsUploading(false);
+        router.push(`/generator?project=${uploadRes.project_id}&job_id=${analysisRes.job_id}`);
+      } else {
+        // Fallback / Demo video mode
+        setUploadProgress(50);
+        const newProj = addProject({
+          name: projectName || "Autonomous AI Revolution & Dev Future",
+          category,
+          status: "analysing",
+          target_clip_count: targetCount,
+          preferred_duration_seconds: preferredDuration,
+          source_filename: "autonomous_ai_revolution_master.mp4",
+          source_file_size_mb: 485,
+          source_duration_seconds: 1200,
+          video_url: previewUrl || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+          thumbnail_url: "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=600&auto=format&fit=crop&q=80",
+          tags: [category, "Shorts"],
+        });
+
+        try {
+          const analysisRes = await startAnalysis({
+            project_id: newProj.id,
+            target_clip_count: targetCount,
+            preferred_duration_seconds: preferredDuration,
+            category,
+          });
+          setUploadProgress(100);
+          setIsUploading(false);
+          router.push(`/generator?project=${newProj.id}&job_id=${analysisRes.job_id}`);
+        } catch {
+          setUploadProgress(100);
+          setIsUploading(false);
+          router.push(`/generator?project=${newProj.id}`);
         }
-        return prev + 25;
-      });
-    }, 400);
-
-    setTimeout(() => {
-      clearInterval(interval);
-      const targetCount = clipCountOption === "custom" ? customClipCount : parseInt(clipCountOption);
-      
-      const newProj = addProject({
-        name: projectName || "Untitled Video Project",
-        category,
-        target_clip_count: targetCount,
-        preferred_duration_seconds: preferredDuration,
-        source_filename: file?.name || "podcast_raw_footage.mp4",
-        source_file_size_mb: file ? Math.round(file.size / (1024 * 1024)) : 480,
-        source_duration_seconds: 2400,
-        video_url: previewUrl || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        thumbnail_url: "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=600&auto=format&fit=crop&q=80"
-      });
-
+      }
+    } catch (err: any) {
       setIsUploading(false);
-      // Navigate to AI Clip Generator to view processing pipeline
-      router.push(`/generator?project=${newProj.id}`);
-    }, 2200);
+      setValidationError(`Upload error: ${err.message || "Failed to process video"}`);
+      addNotification("Upload Failed", err.message || "Error communicating with backend", "warning");
+    }
   };
+
+  const round = (val: number) => Math.round(val);
 
   // Preset demo video option for quick evaluation without local media file
   const loadDemoVideo = () => {
@@ -435,3 +497,4 @@ export default function CreateProjectPage() {
     </div>
   );
 }
+

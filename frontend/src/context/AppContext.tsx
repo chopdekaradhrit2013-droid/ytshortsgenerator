@@ -1,14 +1,27 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Project,
   GeneratedClip,
   PublishingJob,
   ConnectedChannel,
   AppSettings,
-  TimelineTrack
+  TimelineTrack,
+  AuthUser,
+  SubscriptionPlan,
+  UserSubscription,
+  UsageSummary,
+  AccountNotification
 } from '@/types';
+import {
+  getCurrentUserApi,
+  getUsageSummaryApi,
+  listSubscriptionPlansApi,
+  getAccountNotificationsApi,
+  loginUserApi,
+  registerUserApi
+} from '@/lib/api';
 
 // INITIAL SEED DATA
 const INITIAL_PROJECTS: Project[] = [
@@ -325,9 +338,20 @@ interface AppContextType {
   activeStudioTool: string;
   setActiveStudioTool: (tool: string) => void;
   
-  notifications: Array<{ id: string; title: string; message: string; type: 'info' | 'success' | 'warning' }>;
-  addNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning') => void;
+  notifications: Array<{ id: string; title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }>;
+  addNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   dismissNotification: (id: string) => void;
+
+  // Prompt 13: SaaS Auth, Subscription & Usage Management
+  user: AuthUser | null;
+  subscription: UserSubscription | null;
+  usageSummary: UsageSummary | null;
+  plans: SubscriptionPlan[];
+  accountNotifications: AccountNotification[];
+  refreshAuthData: () => Promise<void>;
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: AuthUser; error?: string }>;
+  register: (payload: { email: string; password: string; full_name: string; username?: string }) => Promise<{ success: boolean; error?: string; verification_token?: string }>;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -343,7 +367,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [activeStudioTool, setActiveStudioTool] = useState<string>("select");
-  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; type: 'info' | 'success' | 'warning' }>>([]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }>>([]);
 
   const [connectedChannel, setConnectedChannel] = useState<ConnectedChannel>({
     connected: true,
@@ -353,6 +377,129 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     avatar_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
     last_synced: "Just now"
   });
+
+  // Prompt 13: SaaS Multi-User Auth, Subscriptions & Usage States
+  const [user, setUser] = useState<AuthUser | null>({
+    id: "usr_default_alex",
+    email: "alex.vance@creatorstudio.io",
+    full_name: "Alex Vance",
+    username: "alexvance",
+    avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    is_verified: true,
+    role: "creator",
+    plan_id: "plan_pro",
+    plan_slug: "pro",
+    plan_name: "Viral Agency / Pro",
+    subscription_status: "active",
+    onboarding_completed: true,
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString()
+  });
+
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [accountNotifications, setAccountNotifications] = useState<AccountNotification[]>([]);
+
+  const refreshAuthData = useCallback(async () => {
+    try {
+      const [u, usg, pls, notifs] = await Promise.all([
+        getCurrentUserApi().catch(() => null),
+        getUsageSummaryApi().catch(() => null),
+        listSubscriptionPlansApi().catch(() => []),
+        getAccountNotificationsApi().catch(() => [])
+      ]);
+
+      if (u) {
+        setUser(prev => ({
+          ...(prev || {}),
+          ...u,
+          plan_slug: u.subscription?.plan_slug || prev?.plan_slug || "pro",
+          plan_name: u.subscription?.plan_name || prev?.plan_name || "Pro"
+        }));
+        if (u.subscription) {
+          setSubscription(u.subscription);
+        }
+      }
+
+      if (usg) {
+        setUsageSummary(usg);
+      }
+
+      if (pls && pls.length > 0) {
+        setPlans(pls);
+      }
+
+      if (notifs) {
+        setAccountNotifications(notifs);
+      }
+    } catch {
+      // Background refresh fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAuthData();
+  }, [refreshAuthData]);
+
+  const login = async (email: string, password: string) => {
+    try {
+      const res = await loginUserApi({ email, password });
+      if (res.user && res.user.access_token) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("asf_access_token", res.user.access_token);
+        }
+        setUser(res.user);
+        addNotification("Welcome Back!", `Signed in as ${res.user.full_name}`, "success");
+        await refreshAuthData();
+        return { success: true, user: res.user };
+      }
+      return { success: false, error: res.message || "Login failed." };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Failed to sign in." };
+    }
+  };
+
+  const register = async (payload: { email: string; password: string; full_name: string; username?: string }) => {
+    try {
+      const res = await registerUserApi(payload);
+      if (res.user && res.user.access_token) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("asf_access_token", res.user.access_token);
+        }
+        setUser(res.user);
+        addNotification("Account Created", "Welcome to AI Shorts Factory! Check email to verify.", "success");
+        await refreshAuthData();
+        return { success: true, verification_token: res.user.verification_token };
+      }
+      return { success: false, error: res.message || "Registration failed." };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Registration failed." };
+    }
+  };
+
+  const logout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("asf_access_token");
+    }
+    addNotification("Logged Out", "You have been securely signed out.", "info");
+    // Revert to demo mode
+    setUser({
+      id: "usr_default_alex",
+      email: "alex.vance@creatorstudio.io",
+      full_name: "Alex Vance",
+      username: "alexvance",
+      avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      is_verified: true,
+      role: "creator",
+      plan_id: "plan_pro",
+      plan_slug: "pro",
+      plan_name: "Viral Agency / Pro",
+      subscription_status: "active",
+      onboarding_completed: true,
+      created_at: new Date().toISOString()
+    });
+    refreshAuthData();
+  };
 
   const [studioTracks, setStudioTracks] = useState<TimelineTrack[]>([
     {
@@ -468,7 +615,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [projects, clips, publishingJobs]);
 
-  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
     const id = Math.random().toString(36).substring(7);
     setNotifications(prev => [{ id, title, message, type }, ...prev].slice(0, 5));
     setTimeout(() => {
@@ -725,7 +872,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActiveStudioTool,
         notifications,
         addNotification,
-        dismissNotification
+        dismissNotification,
+        user,
+        subscription,
+        usageSummary,
+        plans,
+        accountNotifications,
+        refreshAuthData,
+        login,
+        register,
+        logout
       }}
     >
       {children}
@@ -740,3 +896,4 @@ export function useApp() {
   }
   return context;
 }
+

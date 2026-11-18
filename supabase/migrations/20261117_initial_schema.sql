@@ -327,3 +327,4 @@ CREATE POLICY "Users can view own publishing jobs" ON public.publishing_jobs FOR
 CREATE POLICY "Users can insert own publishing jobs" ON public.publishing_jobs FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own publishing jobs" ON public.publishing_jobs FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own publishing jobs" ON public.publishing_jobs FOR DELETE USING (auth.uid() = user_id);
+
