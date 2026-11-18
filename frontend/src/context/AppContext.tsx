@@ -252,7 +252,7 @@ const INITIAL_SETTINGS: AppSettings = {
   profile: {
     name: "Adhrit Chopdekar",
     email: "adhrit@shortsfactory.io",
-    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+    avatar: "",
     role: "Creator Pro Plan",
     storage_used_bytes: 5410000000,
     storage_limit_bytes: 10737418240
@@ -384,7 +384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     email: "adhrit@shortsfactory.io",
     full_name: "Adhrit Chopdekar",
     username: "adhrit",
-    avatar_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+    avatar_url: undefined,
     is_verified: true,
     role: "creator",
     plan_id: "plan_pro",
@@ -488,7 +488,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       email: "adhrit@shortsfactory.io",
       full_name: "Adhrit Chopdekar",
       username: "adhrit",
-      avatar_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+      avatar_url: undefined,
       is_verified: true,
       role: "creator",
       plan_id: "plan_pro",

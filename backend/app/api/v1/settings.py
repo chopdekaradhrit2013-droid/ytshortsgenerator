@@ -17,7 +17,7 @@ CURRENT_SETTINGS = {
     "profile": {
         "name": "Adhrit Chopdekar",
         "email": "adhrit@shortsfactory.io",
-        "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+        "avatar": "",
         "role": "Creator Pro Plan"
     },
     "youtube_account": {

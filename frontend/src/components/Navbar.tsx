@@ -220,11 +220,17 @@ export default function Navbar() {
             <span className="text-xs font-semibold text-white max-w-[100px] truncate hidden sm:inline-block">
               {user?.full_name?.split(' ')[0] || 'Adhrit'}
             </span>
-            <img
-              src={user?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"}
-              alt="User Avatar"
-              className="w-7 h-7 rounded-lg object-cover border border-purple-500/40"
-            />
+            {user?.avatar_url && !user.avatar_url.includes('unsplash') ? (
+              <img
+                src={user.avatar_url}
+                alt="User Avatar"
+                className="w-7 h-7 rounded-lg object-cover border border-purple-500/40"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-500 flex items-center justify-center text-[11px] font-black text-white shadow-sm border border-purple-400/40 select-none">
+                {user?.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'AC'}
+              </div>
+            )}
           </button>
 
           {showUserMenu && (

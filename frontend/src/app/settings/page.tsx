@@ -140,11 +140,17 @@ export default function SettingsPage() {
             <div className="space-y-5">
               <h2 className="text-base font-bold text-white">User Profile</h2>
               <div className="flex items-center gap-4 pb-4 border-b border-[#1E2333]">
-                <img
-                  src={settings.profile.avatar}
-                  alt={profileName}
-                  className="w-16 h-16 rounded-2xl object-cover ring-2 ring-purple-500/40"
-                />
+                {settings.profile?.avatar && !settings.profile.avatar.includes('unsplash') ? (
+                  <img
+                    src={settings.profile.avatar}
+                    alt={profileName}
+                    className="w-16 h-16 rounded-2xl object-cover ring-2 ring-purple-500/40"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-500 flex items-center justify-center text-xl font-black text-white ring-2 ring-purple-400/40 select-none shadow-md">
+                    {profileName ? profileName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'AC'}
+                  </div>
+                )}
                 <div>
                   <h3 className="font-bold text-white text-sm">{profileName}</h3>
                   <p className="text-xs text-purple-400">{settings.profile.role}</p>

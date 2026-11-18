@@ -122,11 +122,17 @@ export default function AccountDashboardPage() {
       <div className="p-6 rounded-2xl bg-gradient-to-r from-[#141824] via-[#161C2C] to-[#121622] border border-[#21283B] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <img
-              src={user?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"}
-              alt={user?.full_name || "User Avatar"}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 shadow-lg shadow-purple-500/20"
-            />
+            {user?.avatar_url && !user.avatar_url.includes('unsplash') ? (
+              <img
+                src={user.avatar_url}
+                alt={user?.full_name || "User Avatar"}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-500/40 shadow-lg shadow-purple-500/20"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-500 flex items-center justify-center text-xl font-black text-white border-2 border-purple-400/40 shadow-lg shadow-purple-500/20 select-none">
+                {user?.full_name ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'AC'}
+              </div>
+            )}
             {user?.is_verified && (
               <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#12151E] flex items-center justify-center text-white" title="Verified Creator">
                 <CheckCircle2 className="w-3.5 h-3.5" />

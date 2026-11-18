@@ -1299,7 +1299,7 @@ def init_db():
                 onboarding_completed, onboarding_data, created_at, updated_at
             ) VALUES (
                 'usr_default_alex', 'adhrit@shortsfactory.io', ?, 'Adhrit Chopdekar', 'adhrit',
-                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+                NULL,
                 1, NULL, 'creator', 1, 1,
                 '{"niche": "AI & Tech", "primary_goal": "Grow subscriber base", "target_duration_sec": 45}',
                 datetime('now'), datetime('now')
