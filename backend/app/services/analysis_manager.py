@@ -357,15 +357,19 @@ class AnalysisJobManager:
             conn.close()
 
             # -------------------------------------------------------------
-            # STAGE 7: Preparing clip previews with FFmpeg (95%)
+            # STAGE 7: Preparing clip previews with FFmpeg (90% - 99%)
             # -------------------------------------------------------------
             if cancel_event.is_set(): return
-            update_progress("generating_previews", 92, {"status_text": "Cutting real 9:16 vertical video previews with FFmpeg"})
+            update_progress("generating_previews", 90, {"status_text": "Preparing real 9:16 vertical video previews with FFmpeg"})
 
             rendered_clips = []
+            total_cand = len(raw_candidates)
             for idx, cand in enumerate(raw_candidates):
                 if cancel_event.is_set(): return
                 
+                step_pct = 90 + int(((idx + 1) / total_cand) * 9)
+                update_progress("generating_previews", step_pct, {"status_text": f"Rendering 9:16 vertical Short {idx + 1} of {total_cand} with dynamic reframing"})
+
                 clip_id = f"clip_{uuid.uuid4().hex[:10]}"
                 clip_filename = f"{clip_id}.mp4"
                 clip_thumb_filename = f"{clip_id}_thumb.jpg"

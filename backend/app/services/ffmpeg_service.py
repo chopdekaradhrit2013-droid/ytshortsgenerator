@@ -350,10 +350,11 @@ class FFmpegService:
             "-i", input_path,
             "-vf", vf_filter,
             "-c:v", "libx264",
-            "-preset", "veryfast",
-            "-crf", "22",
+            "-preset", "ultrafast",
+            "-threads", "0",
+            "-crf", "23",
             "-c:a", "aac",
-            "-b:a", "192k",
+            "-b:a", "128k",
             "-movflags", "+faststart",
             output_path
         ]

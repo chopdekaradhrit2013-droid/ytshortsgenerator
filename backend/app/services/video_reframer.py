@@ -44,21 +44,32 @@ class IntelligentVideoReframer:
         height, width = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+        # Fast downscaled image for detection (10x faster Haar cascade execution)
+        scale = min(1.0, 320.0 / max(width, 1))
+        small_w = max(160, int(width * scale))
+        small_h = max(90, int(height * scale))
+        small_gray = cv2.resize(gray, (small_w, small_h), interpolation=cv2.INTER_NEAREST)
+        inv_scale = 1.0 / scale
+
         # 1. Face detection
         faces = self.face_cascade.detectMultiScale(
-            gray,
+            small_gray,
             scaleFactor=1.15,
-            minNeighbors=4,
-            minSize=(int(height * 0.07), int(height * 0.07))
+            minNeighbors=3,
+            minSize=(int(small_h * 0.08), int(small_h * 0.08))
         )
 
         detected_faces = []
-        for (x, y, w, h) in faces:
+        for (sx, sy, sw, sh) in faces:
+            x = int(sx * inv_scale)
+            y = int(sy * inv_scale)
+            w = int(sw * inv_scale)
+            h = int(sh * inv_scale)
             detected_faces.append({
-                "x": int(x),
-                "y": int(y),
-                "w": int(w),
-                "h": int(h),
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
                 "center_x": float((x + (w / 2.0)) / width),
                 "center_y": float((y + (h / 2.0)) / height),
                 "area": int(w * h)
@@ -67,17 +78,21 @@ class IntelligentVideoReframer:
         # Profile face detection if frontal detected 0 faces
         if len(detected_faces) == 0 and self.profile_cascade:
             p_faces = self.profile_cascade.detectMultiScale(
-                gray,
+                small_gray,
                 scaleFactor=1.15,
-                minNeighbors=4,
-                minSize=(int(height * 0.07), int(height * 0.07))
+                minNeighbors=3,
+                minSize=(int(small_h * 0.08), int(small_h * 0.08))
             )
-            for (x, y, w, h) in p_faces:
+            for (sx, sy, sw, sh) in p_faces:
+                x = int(sx * inv_scale)
+                y = int(sy * inv_scale)
+                w = int(sw * inv_scale)
+                h = int(sh * inv_scale)
                 detected_faces.append({
-                    "x": int(x),
-                    "y": int(y),
-                    "w": int(w),
-                    "h": int(h),
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
                     "center_x": float((x + (w / 2.0)) / width),
                     "center_y": float((y + (h / 2.0)) / height),
                     "area": int(w * h)
@@ -201,13 +216,15 @@ class IntelligentVideoReframer:
 
         # Sampling step based on Quality Mode
         if quality_mode == "precision":
-            sample_fps = 8.0
+            sample_fps = 2.0
         elif quality_mode == "standard":
-            sample_fps = 1.5
+            sample_fps = 0.5
         else:  # "smart"
-            sample_fps = 4.0
+            sample_fps = 1.0
 
-        frame_step = max(int(fps / sample_fps), 1)
+        total_clip_frames = max(1, end_frame - start_frame)
+        max_samples = 15
+        frame_step = max(int(fps / sample_fps), int(total_clip_frames / max_samples), 1)
 
         # Resolve scene cuts within the clip window
         clip_cuts: List[float] = []
