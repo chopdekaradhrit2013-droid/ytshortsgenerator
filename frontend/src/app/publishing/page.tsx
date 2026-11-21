@@ -48,6 +48,8 @@ import {
   fetchChannelStatusApi,
   disconnectChannelApi,
   connectDemoChannelApi,
+  connectChannelByHandleApi,
+  configureOAuthApi,
   fetchPublishingJobsApi,
   createPublishingJobApi,
   updatePublishingJobApi,
@@ -65,21 +67,33 @@ import {
 type ActiveTab = 'studio' | 'queue' | 'calendar' | 'history';
 
 export default function PublishingCentrePage() {
-  const { clips, addNotification } = useApp();
+  const { clips, addNotification, refreshConnectedChannel } = useApp();
 
   // Tab State
   const [activeTab, setActiveTab] = useState<ActiveTab>('studio');
 
   // Channel Connection State
   const [channel, setChannel] = useState<ChannelStatusResponse>({
-    connected: true,
-    channel_name: "AI Shorts Factory Studios",
-    channel_id: "UC_x5XG1OV2P6uZZ5FSM9Ttw",
-    subscribers: 148500,
-    avatar_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80",
-    auth_mode: "mock_demo"
+    connected: false,
+    channel_name: "",
+    channel_id: "",
+    subscribers: 0,
+    avatar_url: "",
+    auth_mode: "handle"
   });
   const [channelLoading, setChannelLoading] = useState(false);
+
+  // Channel Connect Modal State
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
+  const [connectTab, setConnectTab] = useState<'handle' | 'oauth'>('handle');
+  const [handleInput, setHandleInput] = useState("@adhrit");
+  const [customTitle, setCustomTitle] = useState("");
+  const [customSubs, setCustomSubs] = useState<string>("");
+  const [isConnectingHandle, setIsConnectingHandle] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleClientSecret, setGoogleClientSecret] = useState("");
+  const [isConfiguringOAuth, setIsConfiguringOAuth] = useState(false);
+  const [showAdvancedCustomize, setShowAdvancedCustomize] = useState(false);
 
   // Jobs State
   const [jobs, setJobs] = useState<PublishingJob[]>([]);
@@ -209,6 +223,73 @@ export default function PublishingCentrePage() {
     }
   }
 
+  async function handleConnectByHandle(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const cleanHandle = handleInput.trim();
+    if (!cleanHandle) {
+      addNotification("Handle Required", "Please enter a YouTube handle, URL, or channel ID.", "warning");
+      return;
+    }
+    setIsConnectingHandle(true);
+    try {
+      const parsedSubs = customSubs.trim() ? parseInt(customSubs.trim(), 10) : undefined;
+      const res = await connectChannelByHandleApi({
+        channel_identifier: cleanHandle,
+        custom_title: customTitle.trim() || undefined,
+        custom_subscribers: !isNaN(parsedSubs as number) ? parsedSubs : undefined
+      });
+      if (res.channel) {
+        setChannel(res.channel);
+        if (refreshConnectedChannel) await refreshConnectedChannel();
+        setConnectModalOpen(false);
+        addNotification(
+          "YouTube Channel Connected!",
+          `Successfully connected ${res.channel.channel_name} (${(res.channel.subscribers / 1000).toFixed(1)}K subscribers).`,
+          "success"
+        );
+      }
+    } catch (err: any) {
+      addNotification("Connection Failed", err.message || "Could not link YouTube channel.", "error");
+    } finally {
+      setIsConnectingHandle(false);
+    }
+  }
+
+  async function handleConfigureOAuth(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!googleClientId.trim() || !googleClientSecret.trim()) {
+      addNotification("Credentials Required", "Please enter both Google Client ID and Client Secret.", "warning");
+      return;
+    }
+    setIsConfiguringOAuth(true);
+    try {
+      const res = await configureOAuthApi({
+        client_id: googleClientId.trim(),
+        client_secret: googleClientSecret.trim()
+      });
+      addNotification("Credentials Saved", "Redirecting to Google OAuth authorization...", "info");
+      if (res.oauth_url) {
+        window.location.href = res.oauth_url;
+      }
+    } catch (err: any) {
+      addNotification("Configuration Error", err.message || "Failed to configure Google OAuth.", "error");
+    } finally {
+      setIsConfiguringOAuth(false);
+    }
+  }
+
+  async function handleConnectDemoMode() {
+    try {
+      const res = await connectDemoChannelApi();
+      setChannel(res);
+      if (refreshConnectedChannel) await refreshConnectedChannel();
+      setConnectModalOpen(false);
+      addNotification("Demo Mode Active", "Connected verified testing channel.", "success");
+    } catch (err: any) {
+      addNotification("Error", "Could not connect demo mode.", "error");
+    }
+  }
+
   async function handleToggleChannel() {
     try {
       if (channel.connected) {
@@ -220,11 +301,10 @@ export default function PublishingCentrePage() {
           subscribers: 0,
           avatar_url: ""
         });
-        addNotification("YouTube Account Disconnected", "Your Google OAuth credentials have been safely unlinked.", "info");
+        if (refreshConnectedChannel) await refreshConnectedChannel();
+        addNotification("YouTube Account Disconnected", "Your channel has been unlinked safely.", "info");
       } else {
-        const res = await connectDemoChannelApi();
-        setChannel(res);
-        addNotification("YouTube Channel Connected", `Successfully linked ${res.channel_name} (${(res.subscribers / 1000).toFixed(1)}K subscribers).`, "success");
+        setConnectModalOpen(true);
       }
     } catch (err) {
       addNotification("Connection Error", "Failed to update channel connection.", "error");
@@ -264,7 +344,8 @@ export default function PublishingCentrePage() {
     }
 
     if (!channel.connected) {
-      addNotification("Channel Not Connected", "Please connect your YouTube channel first.", "warning");
+      setConnectModalOpen(true);
+      addNotification("Channel Not Connected", "Please link your YouTube channel before publishing.", "warning");
       return;
     }
 
@@ -540,65 +621,65 @@ export default function PublishingCentrePage() {
 
           {/* CHANNEL STATUS PILL / CONNECT TOGGLE */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-[#0A0C10] border border-[#23293A] shadow-inner">
-              <div className="relative">
-                {channel.avatar_url ? (
-                  <img
-                    src={channel.avatar_url}
-                    alt={channel.channel_name || "Channel"}
-                    className="w-10 h-10 rounded-xl object-cover ring-2 ring-purple-500/30"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-gray-400">
-                    <YoutubeIcon className="w-5 h-5" />
-                  </div>
-                )}
-                <span
-                  className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#0A0C10] ${
-                    channel.connected ? 'bg-emerald-500' : 'bg-gray-500'
-                  }`}
-                />
-              </div>
-              <div className="text-left pr-2">
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-bold text-white leading-tight">
-                    {channel.connected ? channel.channel_name : "No Channel Connected"}
-                  </p>
-                  {channel.connected && (
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            {channel.connected ? (
+              <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-[#0A0C10] border border-emerald-500/30 shadow-inner">
+                <div className="relative">
+                  {channel.avatar_url && !channel.avatar_url.includes('unsplash') ? (
+                    <img
+                      src={channel.avatar_url}
+                      alt={channel.channel_name || "Channel"}
+                      className="w-10 h-10 rounded-xl object-cover ring-2 ring-emerald-500/40"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-600 flex items-center justify-center text-white font-bold text-xs ring-2 ring-emerald-500/40">
+                      {channel.channel_name ? channel.channel_name.slice(0, 2).toUpperCase() : 'YT'}
+                    </div>
                   )}
+                  <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#0A0C10] bg-emerald-500" />
                 </div>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  {channel.connected
-                    ? `${(channel.subscribers / 1000).toFixed(1)}K subscribers • ID: ${channel.channel_id.substring(0, 10)}...`
-                    : "Authorize via Google OAuth 2.0"}
-                </p>
+                <div className="text-left pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-white leading-tight">
+                      {channel.channel_name}
+                    </p>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {channel.subscribers > 0 ? `${(channel.subscribers / 1000).toFixed(1)}K subscribers • ` : ''}
+                    ID: {channel.channel_id.substring(0, 10)}...
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : null}
 
-            <button
-              onClick={handleToggleChannel}
-              disabled={channelLoading}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md ${
-                channel.connected
-                  ? 'bg-[#1C2130] text-gray-300 hover:text-red-400 hover:bg-red-950/20 border border-[#2A3144]'
-                  : 'bg-red-600 hover:bg-red-500 text-white shadow-red-600/30 active:scale-95'
-              }`}
-            >
-              {channelLoading ? (
-                <RotateCw className="w-3.5 h-3.5 animate-spin" />
-              ) : channel.connected ? (
-                <>
+            {channel.connected ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setConnectModalOpen(true)}
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#1C2130] text-gray-200 hover:text-white hover:bg-[#252C40] border border-[#2A3144] transition-all flex items-center gap-1.5"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Switch Channel</span>
+                </button>
+                <button
+                  onClick={handleToggleChannel}
+                  disabled={channelLoading}
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-red-950/20 text-red-400 hover:bg-red-900/30 border border-red-500/20 transition-all flex items-center gap-1.5"
+                >
                   <WifiOff className="w-3.5 h-3.5" />
                   <span>Disconnect</span>
-                </>
-              ) : (
-                <>
-                  <YoutubeIcon className="w-4 h-4 text-white" />
-                  <span>Connect YouTube Account</span>
-                </>
-              )}
-            </button>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConnectModalOpen(true)}
+                disabled={channelLoading}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-red-600/30 active:scale-95 transition-all flex items-center gap-2"
+              >
+                <YoutubeIcon className="w-4 h-4 text-white" />
+                <span>Connect YouTube Account</span>
+              </button>
+            )}
 
             <button
               onClick={() => setBatchModalOpen(true)}
@@ -633,6 +714,38 @@ export default function PublishingCentrePage() {
           </div>
         </div>
       </div>
+
+      {/* DISCONNECTED CALL-TO-ACTION BANNER */}
+      {!channel.connected && (
+        <div className="p-6 rounded-3xl bg-gradient-to-r from-red-950/40 via-[#18121E] to-[#12151E] border border-red-500/30 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl relative overflow-hidden animate-in fade-in duration-300">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-600/20 text-red-500 flex items-center justify-center shrink-0 border border-red-500/40 shadow-lg shadow-red-600/20">
+              <YoutubeIcon className="w-8 h-8 text-red-500" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-bold text-white tracking-tight">Connect Your YouTube Channel</h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/30">
+                  Direct Uploads & Scheduling
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 max-w-xl leading-relaxed">
+                Link your channel via your <strong>@handle</strong> (instant zero-configuration setup) or official <strong>Google OAuth 2.0</strong> to enable 1-click publishing, SEO optimization, and automated scheduling.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => { setConnectTab('handle'); setConnectModalOpen(true); }}
+              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs shadow-xl shadow-red-600/30 flex items-center gap-2 active:scale-95 transition-all"
+            >
+              <YoutubeIcon className="w-4 h-4 text-white" />
+              <span>Connect YouTube Channel</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. NAVIGATION TABS */}
       <div className="flex items-center gap-2 border-b border-[#23293A] pb-3 overflow-x-auto">
@@ -1795,6 +1908,230 @@ export default function PublishingCentrePage() {
           }
         }}
       />
+
+      {/* CONNECT YOUTUBE CHANNEL MODAL */}
+      {connectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-[#12151E] border border-[#272E44] p-6 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E2333]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-600/20 text-red-500 flex items-center justify-center border border-red-500/30">
+                  <YoutubeIcon className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white tracking-tight">Connect YouTube Channel</h2>
+                  <p className="text-[11px] text-gray-400">Link your account to auto-publish and schedule Shorts.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConnectModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-[#1E2333] text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-2 p-1 rounded-2xl bg-[#0A0C10] border border-[#1E2333] text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setConnectTab('handle')}
+                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  connectTab === 'handle'
+                    ? 'bg-red-600 text-white shadow-md font-bold'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>Fast Handle Connect</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/30 text-red-100">Recommended</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConnectTab('oauth')}
+                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  connectTab === 'oauth'
+                    ? 'bg-red-600 text-white shadow-md font-bold'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>Google OAuth 2.0</span>
+              </button>
+            </div>
+
+            {/* TAB 1: FAST HANDLE CONNECT */}
+            {connectTab === 'handle' && (
+              <form onSubmit={handleConnectByHandle} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-300">YouTube Channel Handle or Link</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={handleInput}
+                      onChange={(e) => setHandleInput(e.target.value)}
+                      placeholder="@adhrit or https://youtube.com/@channel"
+                      className="w-full pl-3 pr-24 py-2.5 rounded-xl bg-[#0A0C10] border border-[#23293D] text-white text-xs focus:outline-none focus:border-red-500"
+                    />
+                    <div className="absolute right-2 top-2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setHandleInput("@adhrit")}
+                        className="px-2 py-1 rounded-lg bg-[#1E2333] hover:bg-[#283045] text-purple-300 text-[10px] font-semibold transition-colors"
+                      >
+                        @adhrit
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    Works instantly with any YouTube handle (@creator) or full channel URL.
+                  </p>
+                </div>
+
+                {/* Popular Handles Quick Pick */}
+                <div className="space-y-1">
+                  <span className="text-[10px] text-gray-400 font-medium">Quick Suggestions:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["@adhrit", "@MrBeast", "@mkbhd", "@Veritasium"].map(h => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setHandleInput(h)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono transition-colors ${
+                          handleInput === h
+                            ? 'bg-red-600/30 text-red-300 border border-red-500/40'
+                            : 'bg-[#151924] hover:bg-[#1E2434] text-gray-300 border border-[#23293A]'
+                        }`}
+                      >
+                        {h}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Optional Customization toggle */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedCustomize(!showAdvancedCustomize)}
+                    className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1"
+                  >
+                    <span>{showAdvancedCustomize ? 'Hide Customization Options ▲' : 'Customize Channel Title & Subscribers ▼'}</span>
+                  </button>
+
+                  {showAdvancedCustomize && (
+                    <div className="mt-2.5 p-3.5 rounded-2xl bg-[#0A0C10] border border-[#1E2333] space-y-3 animate-in fade-in duration-200">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-400">Custom Channel Display Name</label>
+                        <input
+                          type="text"
+                          value={customTitle}
+                          onChange={(e) => setCustomTitle(e.target.value)}
+                          placeholder="e.g. Adhrit Chopdekar"
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#141824] border border-[#23293A] text-white text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-400">Custom Subscriber Count</label>
+                        <input
+                          type="number"
+                          value={customSubs}
+                          onChange={(e) => setCustomSubs(e.target.value)}
+                          placeholder="e.g. 25000"
+                          className="w-full px-3 py-1.5 rounded-lg bg-[#141824] border border-[#23293A] text-white text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Action */}
+                <div className="pt-2 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handleConnectDemoMode}
+                    className="text-[11px] text-gray-400 hover:text-gray-200 underline"
+                  >
+                    Test with Demo Channel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isConnectingHandle}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isConnectingHandle ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>Connect Channel</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 2: GOOGLE OAUTH 2.0 */}
+            {connectTab === 'oauth' && (
+              <form onSubmit={handleConfigureOAuth} className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-[#0A0C10] border border-[#1E2333] space-y-2 text-xs">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Google Cloud Console Setup</span>
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1 text-gray-300 text-[11px] leading-relaxed">
+                    <li>Create an OAuth 2.0 Client ID in your Google Cloud Console.</li>
+                    <li>Add this exact Authorized Redirect URI:</li>
+                  </ol>
+                  <div className="p-2 rounded-lg bg-black/40 border border-[#23293D] flex items-center justify-between font-mono text-[11px] text-purple-300">
+                    <span>http://localhost:3000/publishing</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText("http://localhost:3000/publishing");
+                        addNotification("Copied", "Redirect URI copied to clipboard.", "info");
+                      }}
+                      className="text-gray-400 hover:text-white"
+                      title="Copy"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-300">Google Client ID</label>
+                  <input
+                    type="text"
+                    value={googleClientId}
+                    onChange={(e) => setGoogleClientId(e.target.value)}
+                    placeholder="xxxxxxxxxxxx-xxxxxxxx.apps.googleusercontent.com"
+                    className="w-full px-3 py-2 rounded-xl bg-[#0A0C10] border border-[#23293D] text-white text-xs font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-300">Google Client Secret</label>
+                  <input
+                    type="password"
+                    value={googleClientSecret}
+                    onChange={(e) => setGoogleClientSecret(e.target.value)}
+                    placeholder="GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxx"
+                    className="w-full px-3 py-2 rounded-xl bg-[#0A0C10] border border-[#23293D] text-white text-xs font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isConfiguringOAuth}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {isConfiguringOAuth ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                    <span>Save & Authorize with Google</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

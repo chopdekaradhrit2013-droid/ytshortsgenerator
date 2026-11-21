@@ -52,7 +52,7 @@ export default function UploadHistoryPage() {
       status: "published",
       thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
       visibility: "public",
-      channel_name: "AI Shorts Factory Studios"
+      channel_name: "Adhrit Chopdekar"
     },
     {
       id: "h-2",
@@ -65,7 +65,7 @@ export default function UploadHistoryPage() {
       status: "published",
       thumbnail: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&auto=format&fit=crop&q=80",
       visibility: "public",
-      channel_name: "AI Shorts Factory Studios"
+      channel_name: "Adhrit Chopdekar"
     },
     {
       id: "h-3",
@@ -78,7 +78,7 @@ export default function UploadHistoryPage() {
       status: "published",
       thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
       visibility: "public",
-      channel_name: "AI Shorts Factory Studios"
+      channel_name: "Adhrit Chopdekar"
     }
   ];
 
@@ -98,7 +98,7 @@ export default function UploadHistoryPage() {
         setChannelInfo(chRes.value);
       }
 
-      const defaultChannelName = chRes.status === 'fulfilled' ? chRes.value.channel_name : "AI Shorts Factory Studios";
+      const defaultChannelName = chRes.status === 'fulfilled' && chRes.value.channel_name ? chRes.value.channel_name : "Adhrit Chopdekar";
 
       if (jobsRes.status === 'fulfilled' && jobsRes.value.jobs && jobsRes.value.jobs.length > 0) {
         const liveItems: HistoryShortItem[] = jobsRes.value.jobs.map((j: PublishingJob, index: number) => ({

@@ -14,6 +14,8 @@ from backend.app.models.schemas import (
     PublishingJobUpdate,
     PublishingJobResponse,
     ConnectedChannelResponse,
+    ConnectHandleRequest,
+    OAuthConfigureRequest,
     SEOMetadataSuggestRequest,
     SEOMetadataSuggestResponse,
     BatchPublishRequest
@@ -106,11 +108,14 @@ def run_background_upload(job_id: str):
 # -------------------------------------------------------------
 # 1. CHANNEL CONNECTION & OAUTH ENDPOINTS
 # -------------------------------------------------------------
+# 1. CHANNEL CONNECTION & OAUTH ENDPOINTS
+# -------------------------------------------------------------
 
 @router.get("/channel-status")
 def get_channel_status():
     """
     Returns live connected YouTube channel status from server database.
+    Dual-key response ensures seamless compatibility across all frontend components.
     """
     conn = get_db_connection()
     cur = conn.cursor()
@@ -123,24 +128,105 @@ def get_channel_status():
 
     if row:
         ch = dict(row)
+        title = ch["channel_title"]
+        handle = f"@{title.replace(' ', '').lower()}"
+        is_oauth = bool(ch.get("access_token") and not str(ch.get("access_token", "")).startswith("handle_"))
         return {
             "is_configured": is_configured,
+            "connected": True,
             "channel_connected": True,
-            "channel_title": ch["channel_title"],
+            "channel_name": title,
+            "channel_title": title,
             "channel_id": ch["channel_id"],
+            "subscribers": ch["subscriber_count"],
             "subscriber_count": ch["subscriber_count"],
             "avatar_url": ch["avatar_url"],
+            "handle": handle,
+            "auth_mode": "oauth" if is_oauth else "handle",
             "oauth_url": youtube_publisher_service.get_auth_url(redirect_uri) if is_configured else None
         }
 
     return {
         "is_configured": is_configured,
+        "connected": False,
         "channel_connected": False,
+        "channel_name": None,
         "channel_title": None,
         "channel_id": None,
+        "subscribers": 0,
         "subscriber_count": 0,
         "avatar_url": None,
+        "handle": None,
+        "auth_mode": None,
         "oauth_url": youtube_publisher_service.get_auth_url(redirect_uri) if is_configured else None
+    }
+
+@router.post("/channel/connect-handle")
+def connect_channel_handle(payload: ConnectHandleRequest):
+    """
+    Connects a YouTube channel directly via handle (@creator), URL, or Channel ID.
+    Resolves metadata (verified title, subscriber count, avatar) and links to current user.
+    """
+    meta = youtube_publisher_service.resolve_channel_metadata(
+        identifier=payload.channel_identifier,
+        custom_title=payload.custom_title,
+        custom_subscribers=payload.custom_subscribers,
+        custom_avatar_url=payload.custom_avatar_url
+    )
+
+    channel_id = meta["channel_id"]
+    channel_title = meta["channel_title"]
+    sub_count = meta["subscriber_count"]
+    avatar_url = meta["avatar_url"]
+    handle = meta.get("handle", payload.channel_identifier)
+
+    conn = get_db_connection()
+    with conn:
+        # Mark other channels disconnected
+        conn.execute("UPDATE connected_channels SET is_connected = 0 WHERE is_connected = 1;")
+        conn.execute("""
+            INSERT INTO connected_channels (
+                id, platform, channel_title, channel_id, subscriber_count,
+                avatar_url, access_token, refresh_token, token_expiry,
+                scopes, is_connected, created_at, updated_at, user_id
+            ) VALUES (?, 'youtube', ?, ?, ?, ?, ?, ?, datetime('now', '+1 year'), '["https://www.googleapis.com/auth/youtube.upload"]', 1, datetime('now'), datetime('now'), 'usr_default_alex')
+            ON CONFLICT(channel_id) DO UPDATE SET
+                channel_title = excluded.channel_title,
+                subscriber_count = excluded.subscriber_count,
+                avatar_url = excluded.avatar_url,
+                is_connected = 1,
+                updated_at = datetime('now');
+        """, (f"ch_{uuid.uuid4().hex[:8]}", channel_title, channel_id, sub_count, avatar_url, f"handle_acc_{uuid.uuid4().hex[:12]}", f"handle_ref_{uuid.uuid4().hex[:12]}"))
+    conn.close()
+
+    return {
+        "success": True,
+        "message": f"Successfully connected channel {channel_title}",
+        "channel": {
+            "connected": True,
+            "channel_connected": True,
+            "channel_name": channel_title,
+            "channel_title": channel_title,
+            "channel_id": channel_id,
+            "subscribers": sub_count,
+            "subscriber_count": sub_count,
+            "avatar_url": avatar_url,
+            "handle": handle,
+            "auth_mode": "handle"
+        }
+    }
+
+@router.post("/oauth/configure")
+def configure_oauth(payload: OAuthConfigureRequest):
+    """
+    Saves Google OAuth 2.0 Client ID & Client Secret and returns new authorization URL.
+    """
+    youtube_publisher_service.configure_credentials(payload.client_id, payload.client_secret)
+    redirect_uri = "http://localhost:3000/publishing"
+    return {
+        "success": True,
+        "is_configured": youtube_publisher_service.is_configured(),
+        "oauth_url": youtube_publisher_service.get_auth_url(redirect_uri)
     }
 
 @router.get("/oauth/url")
@@ -166,12 +252,13 @@ def oauth_callback(code: str = Query(...), redirect_uri: Optional[str] = Query("
 
     conn = get_db_connection()
     with conn:
+        conn.execute("UPDATE connected_channels SET is_connected = 0 WHERE is_connected = 1;")
         conn.execute("""
             INSERT INTO connected_channels (
                 id, platform, channel_title, channel_id, subscriber_count,
                 avatar_url, access_token, refresh_token, token_expiry,
-                scopes, is_connected, created_at, updated_at
-            ) VALUES (?, 'youtube', ?, ?, ?, ?, ?, ?, datetime('now', '+1 hour'), '["https://www.googleapis.com/auth/youtube.upload"]', 1, datetime('now'), datetime('now'))
+                scopes, is_connected, created_at, updated_at, user_id
+            ) VALUES (?, 'youtube', ?, ?, ?, ?, ?, ?, datetime('now', '+1 hour'), '["https://www.googleapis.com/auth/youtube.upload"]', 1, datetime('now'), datetime('now'), 'usr_default_alex')
             ON CONFLICT(channel_id) DO UPDATE SET
                 channel_title = excluded.channel_title,
                 subscriber_count = excluded.subscriber_count,
@@ -201,13 +288,14 @@ def disconnect_channel():
 
     for r in rows:
         token = r["access_token"]
-        youtube_publisher_service.revoke_token(token)
+        if token:
+            youtube_publisher_service.revoke_token(token)
 
     with conn:
         conn.execute("UPDATE connected_channels SET is_connected = 0, access_token = NULL, updated_at = datetime('now');")
     conn.close()
 
-    return {"success": True, "message": "YouTube account disconnected successfully."}
+    return {"success": True, "connected": False, "channel_connected": False, "message": "YouTube account disconnected successfully."}
 
 @router.post("/channel/connect-demo")
 def connect_demo_channel():
@@ -220,17 +308,33 @@ def connect_demo_channel():
             INSERT INTO connected_channels (
                 id, platform, channel_title, channel_id, subscriber_count,
                 avatar_url, access_token, refresh_token, token_expiry,
-                scopes, is_connected, created_at, updated_at
+                scopes, is_connected, created_at, updated_at, user_id
             ) VALUES (
                 'ch_demo_studio', 'youtube', 'AI Shorts Factory Studios', 'UC_x5XG1OV2P6uZZ5FSM9Ttw',
-                148500, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80',
+                148500, 'https://api.dicebear.com/7.x/initials/svg?seed=AIShorts&chars=2&backgroundColor=6366f1,8b5cf6&fontSize=42&fontWeight=700',
                 'demo_token_authenticated', 'demo_refresh_token', '2099-12-31T23:59:59Z',
-                '["https://www.googleapis.com/auth/youtube.upload"]', 1, datetime('now'), datetime('now')
+                '["https://www.googleapis.com/auth/youtube.upload"]', 1, datetime('now'), datetime('now'), 'usr_default_alex'
             )
-            ON CONFLICT(channel_id) DO UPDATE SET is_connected = 1, updated_at = datetime('now');
+            ON CONFLICT(channel_id) DO UPDATE SET
+                channel_title = excluded.channel_title,
+                subscriber_count = excluded.subscriber_count,
+                avatar_url = excluded.avatar_url,
+                is_connected = 1,
+                updated_at = datetime('now');
         """)
     conn.close()
-    return {"success": True, "message": "Demo channel connected."}
+    return {
+        "success": True,
+        "connected": True,
+        "channel_connected": True,
+        "channel_name": "AI Shorts Factory Studios",
+        "channel_title": "AI Shorts Factory Studios",
+        "channel_id": "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+        "subscribers": 148500,
+        "subscriber_count": 148500,
+        "avatar_url": "https://api.dicebear.com/7.x/initials/svg?seed=AIShorts&chars=2&backgroundColor=6366f1,8b5cf6&fontSize=42&fontWeight=700",
+        "message": "Demo channel connected."
+    }
 
 # -------------------------------------------------------------
 # 2. SEO AUTO-SUGGESTION

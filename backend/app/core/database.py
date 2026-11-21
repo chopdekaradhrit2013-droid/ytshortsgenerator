@@ -627,12 +627,12 @@ def init_db():
                 INSERT INTO connected_channels (
                     id, platform, channel_title, channel_id, subscriber_count,
                     avatar_url, access_token, refresh_token, token_expiry,
-                    scopes, is_connected, created_at, updated_at
+                    scopes, is_connected, created_at, updated_at, user_id
                 ) VALUES (
-                    'ch_default_1', 'youtube', 'AI Shorts Factory Studios', 'UC_x5XG1OV2P6uZZ5FSM9Ttw',
-                    148500, 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80',
-                    'demo_token_authenticated', 'demo_refresh_token', '2099-12-31T23:59:59Z',
-                    '["https://www.googleapis.com/auth/youtube.upload"]', 1, datetime('now'), datetime('now')
+                    'ch_adhrit_1', 'youtube', 'Adhrit Chopdekar', 'UC_adhrit_chopdekar_shorts',
+                    24800, 'https://api.dicebear.com/7.x/initials/svg?seed=Adhrit&chars=2&backgroundColor=6366f1,8b5cf6&fontSize=42&fontWeight=700',
+                    'handle_acc_adhrit', 'handle_ref_adhrit', '2099-12-31T23:59:59Z',
+                    '["https://www.googleapis.com/auth/youtube.upload"]', 0, datetime('now'), datetime('now'), 'usr_default_alex'
                 );
             """)
 

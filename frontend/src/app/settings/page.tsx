@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Settings as SettingsIcon,
   User,
@@ -18,7 +19,7 @@ import YoutubeIcon from '@/components/YoutubeIcon';
 import { useApp } from '@/context/AppContext';
 
 export default function SettingsPage() {
-  const { settings, updateSettings, addNotification } = useApp();
+  const { settings, updateSettings, connectedChannel, toggleChannelConnection, addNotification } = useApp();
 
   const [activeSection, setActiveSection] = useState<'profile' | 'youtube' | 'editing' | 'captions' | 'export' | 'storage' | 'app'>('profile');
 
@@ -183,23 +184,78 @@ export default function SettingsPage() {
           {/* YOUTUBE SECTION */}
           {activeSection === 'youtube' && (
             <div className="space-y-5">
-              <h2 className="text-base font-bold text-white">Connected YouTube Channel</h2>
-              <div className="p-4 rounded-xl bg-[#0A0C10] border border-[#1E2333] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center">
-                    <YoutubeIcon className="w-6 h-6 text-red-500" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-white">Connected YouTube Channel</h2>
+                  <p className="text-xs text-gray-400">Manage direct API publishing, default privacy, and automatic metadata.</p>
+                </div>
+                <Link
+                  href="/publishing"
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Publishing Hub</span>
+                </Link>
+              </div>
+
+              {connectedChannel.connected ? (
+                <div className="p-4 rounded-xl bg-[#0A0C10] border border-[#1E2333] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    {connectedChannel.avatar_url && !connectedChannel.avatar_url.includes('unsplash') ? (
+                      <img
+                        src={connectedChannel.avatar_url}
+                        alt="Channel Avatar"
+                        className="w-12 h-12 rounded-xl object-cover border border-[#272E42]"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center font-bold text-sm">
+                        <YoutubeIcon className="w-6 h-6 text-red-500" />
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-white text-sm">{connectedChannel.channel_name}</h3>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {connectedChannel.subscribers > 0 ? `${connectedChannel.subscribers.toLocaleString()} subscribers • ` : ''}
+                        ID: <span className="font-mono text-gray-300">{connectedChannel.channel_id}</span>
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-white text-xs">{settings.youtube_account.channel_name}</h3>
-                    <p className="text-[11px] text-gray-400">
-                      Channel ID: {settings.youtube_account.channel_id} • 148.5K subscribers
-                    </p>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={toggleChannelConnection}
+                      className="px-3.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold transition-colors"
+                    >
+                      Disconnect
+                    </button>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  Connected
-                </span>
-              </div>
+              ) : (
+                <div className="p-5 rounded-2xl bg-[#0A0C10] border border-dashed border-[#262D40] text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-red-600/10 text-red-500 flex items-center justify-center mx-auto">
+                    <YoutubeIcon className="w-7 h-7 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">No YouTube Channel Connected</h3>
+                    <p className="text-xs text-gray-400 max-w-md mx-auto mt-1">
+                      Link your YouTube channel to enable 1-click publishing, SEO suggestions, and automated scheduled uploads.
+                    </p>
+                  </div>
+                  <Link
+                    href="/publishing"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs shadow-md shadow-red-600/20 transition-all"
+                  >
+                    <YoutubeIcon className="w-4 h-4 text-white" />
+                    <span>Connect Channel in Publishing Hub</span>
+                  </Link>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div className="space-y-1.5">

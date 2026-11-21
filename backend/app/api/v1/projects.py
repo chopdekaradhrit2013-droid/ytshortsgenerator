@@ -103,7 +103,19 @@ def get_dashboard_stats():
     cur.execute("SELECT COUNT(*) FROM generated_clips WHERE status = 'ready';")
     ready_clips = cur.fetchone()[0]
 
+    cur.execute("SELECT * FROM connected_channels WHERE is_connected = 1 ORDER BY updated_at DESC LIMIT 1;")
+    ch_row = cur.fetchone()
+
     conn.close()
+
+    channel_data = None
+    if ch_row:
+        ch = dict(ch_row)
+        channel_data = {
+            "channel_title": ch["channel_title"],
+            "subscriber_count": ch["subscriber_count"],
+            "status": "connected"
+        }
 
     return {
         "total_projects": max(total_projects, 3),
@@ -111,11 +123,7 @@ def get_dashboard_stats():
         "clips_ready_to_publish": max(ready_clips, 11),
         "successfully_published": 3,
         "storage_used_bytes": 5170000000,
-        "connected_channel": {
-            "channel_title": "AI Shorts Factory Studios",
-            "subscriber_count": 148500,
-            "status": "connected"
-        }
+        "connected_channel": channel_data
     }
 
 @router.post("", response_model=ProjectResponse)

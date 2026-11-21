@@ -237,8 +237,8 @@ class YouTubeAnalyticsService:
             # Total Current Subscribers from Connected Channel
             cur.execute("SELECT subscriber_count, channel_title, channel_id, avatar_url FROM connected_channels WHERE is_connected = 1 LIMIT 1;")
             ch_row = cur.fetchone()
-            current_subs = ch_row["subscriber_count"] if ch_row else 148500
-            channel_name = ch_row["channel_title"] if ch_row else "AI Shorts Factory Studios"
+            current_subs = ch_row["subscriber_count"] if ch_row else 0
+            channel_name = ch_row["channel_title"] if ch_row else "YouTube Creator"
             avatar_url = ch_row["avatar_url"] if ch_row else ""
 
             def calc_pct(current_val, prev_val):

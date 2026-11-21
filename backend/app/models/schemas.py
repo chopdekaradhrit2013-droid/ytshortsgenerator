@@ -273,6 +273,16 @@ class ConnectedChannelResponse(BaseModel):
     is_connected: bool = True
     created_at: datetime
 
+class ConnectHandleRequest(BaseModel):
+    channel_identifier: str
+    custom_title: Optional[str] = None
+    custom_subscribers: Optional[int] = None
+    custom_avatar_url: Optional[str] = None
+
+class OAuthConfigureRequest(BaseModel):
+    client_id: str
+    client_secret: str
+
 class SEOMetadataSuggestRequest(BaseModel):
     clip_id: str
     category: Optional[str] = "general"

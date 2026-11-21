@@ -20,7 +20,9 @@ import {
   listSubscriptionPlansApi,
   getAccountNotificationsApi,
   loginUserApi,
-  registerUserApi
+  registerUserApi,
+  fetchChannelStatusApi,
+  disconnectChannelApi
 } from '@/lib/api';
 
 // INITIAL SEED DATA
@@ -258,9 +260,9 @@ const INITIAL_SETTINGS: AppSettings = {
     storage_limit_bytes: 10737418240
   },
   youtube_account: {
-    channel_name: "AI Shorts Factory Studios",
-    channel_id: "UC_x5XG1OV2P6uZZ5FSM9Ttw",
-    subscribers: 148500,
+    channel_name: "",
+    channel_id: "",
+    subscribers: 0,
     auto_publish_approved: false,
     default_visibility: "public",
     default_tags: "Shorts, AI, Viral, Tech"
@@ -322,6 +324,7 @@ interface AppContextType {
   
   connectedChannel: ConnectedChannel;
   toggleChannelConnection: () => void;
+  refreshConnectedChannel: () => Promise<void>;
   
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
@@ -370,13 +373,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }>>([]);
 
   const [connectedChannel, setConnectedChannel] = useState<ConnectedChannel>({
-    connected: true,
-    channel_name: "AI Shorts Factory Studios",
-    channel_id: "UC_x5XG1OV2P6uZZ5FSM9Ttw",
-    subscribers: 148500,
-    avatar_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
-    last_synced: "Just now"
+    connected: false,
+    channel_name: "",
+    channel_id: "",
+    subscribers: 0,
+    avatar_url: "",
+    last_synced: "Never"
   });
+
+  const refreshConnectedChannel = useCallback(async () => {
+    try {
+      const ch = await fetchChannelStatusApi();
+      if (ch && ch.connected) {
+        setConnectedChannel({
+          connected: true,
+          channel_name: ch.channel_name,
+          channel_id: ch.channel_id,
+          subscribers: ch.subscribers,
+          avatar_url: ch.avatar_url,
+          last_synced: "Just now"
+        });
+      } else {
+        setConnectedChannel({
+          connected: false,
+          channel_name: "",
+          channel_id: "",
+          subscribers: 0,
+          avatar_url: "",
+          last_synced: "Never"
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to refresh channel status", e);
+    }
+  }, []);
 
   // Prompt 13: SaaS Multi-User Auth, Subscriptions & Usage States
   const [user, setUser] = useState<AuthUser | null>({
@@ -439,7 +469,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshAuthData();
-  }, [refreshAuthData]);
+    refreshConnectedChannel();
+  }, [refreshAuthData, refreshConnectedChannel]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -819,17 +850,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     startUploadJob(id);
   };
 
-  const toggleChannelConnection = () => {
-    setConnectedChannel(prev => ({
-      ...prev,
-      connected: !prev.connected,
-      last_synced: !prev.connected ? "Just now" : undefined
-    }));
-    addNotification(
-      connectedChannel.connected ? "YouTube Channel Disconnected" : "YouTube Channel Connected",
-      connectedChannel.connected ? "Account unlinked from AI Shorts Factory." : "Successfully connected AI Shorts Factory Studios.",
-      connectedChannel.connected ? "warning" : "success"
-    );
+  const toggleChannelConnection = async () => {
+    try {
+      if (connectedChannel.connected) {
+        await disconnectChannelApi();
+        setConnectedChannel({
+          connected: false,
+          channel_name: "",
+          channel_id: "",
+          subscribers: 0,
+          avatar_url: "",
+          last_synced: "Never"
+        });
+        addNotification("YouTube Channel Disconnected", "Account unlinked safely.", "info");
+      }
+    } catch (err: any) {
+      addNotification("Error", err.message || "Failed to disconnect channel", "error");
+    }
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
@@ -858,6 +895,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         retryJob,
         connectedChannel,
         toggleChannelConnection,
+        refreshConnectedChannel,
         settings,
         updateSettings,
         sidebarCollapsed,

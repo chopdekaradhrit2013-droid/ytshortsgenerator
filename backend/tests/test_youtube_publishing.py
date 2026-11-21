@@ -156,3 +156,35 @@ def test_batch_publish_multiple_shorts():
     assert data["queued"] == len(clip_ids)
     assert len(data["jobs"]) == len(clip_ids)
 
+def test_connect_channel_by_handle_and_verify():
+    # Connect by handle
+    payload = {
+        "channel_identifier": "@adhrit",
+        "custom_title": "Adhrit Chopdekar",
+        "custom_subscribers": 25000
+    }
+    res = client.post("/api/v1/publishing/channel/connect-handle", json=payload)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["success"] is True
+    assert body["channel"]["channel_title"] == "Adhrit Chopdekar"
+    assert body["channel"]["connected"] is True
+    assert body["channel"]["subscriber_count"] == 25000
+
+    # Verify status
+    status = client.get("/api/v1/publishing/channel-status").json()
+    assert status["connected"] is True
+    assert status["channel_title"] == "Adhrit Chopdekar"
+    assert status["subscriber_count"] == 25000
+
+def test_configure_oauth():
+    res = client.post("/api/v1/publishing/oauth/configure", json={
+        "client_id": "test_client_id_123.apps.googleusercontent.com",
+        "client_secret": "test_client_secret_xyz"
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["success"] is True
+    assert body["is_configured"] is True
+    assert "accounts.google.com" in body["oauth_url"]
+

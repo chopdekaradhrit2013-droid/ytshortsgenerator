@@ -1,6 +1,7 @@
 from typing import Dict, Any
 from fastapi import APIRouter
 from pydantic import BaseModel
+from backend.app.core.database import get_db_connection
 
 router = APIRouter()
 
@@ -21,9 +22,10 @@ CURRENT_SETTINGS = {
         "role": "Creator Pro Plan"
     },
     "youtube_account": {
-        "channel_name": "AI Shorts Factory Studios",
-        "channel_id": "UC_x5XG1OV2P6uZZ5FSM9Ttw",
-        "subscribers": 148500,
+        "channel_name": "",
+        "channel_id": "",
+        "subscribers": 0,
+        "is_connected": False,
         "auto_publish_approved": False,
         "default_visibility": "public",
         "default_tags": "Shorts, AI, Viral, Tech"
@@ -66,6 +68,22 @@ CURRENT_SETTINGS = {
 
 @router.get("")
 def get_settings():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM connected_channels WHERE is_connected = 1 ORDER BY updated_at DESC LIMIT 1;")
+        ch = cur.fetchone()
+        conn.close()
+        if ch:
+            CURRENT_SETTINGS["youtube_account"]["channel_name"] = ch["channel_title"]
+            CURRENT_SETTINGS["youtube_account"]["channel_id"] = ch["channel_id"]
+            CURRENT_SETTINGS["youtube_account"]["subscribers"] = ch["subscriber_count"]
+            CURRENT_SETTINGS["youtube_account"]["avatar_url"] = ch["avatar_url"]
+            CURRENT_SETTINGS["youtube_account"]["is_connected"] = True
+        else:
+            CURRENT_SETTINGS["youtube_account"]["is_connected"] = False
+    except Exception:
+        pass
     return CURRENT_SETTINGS
 
 @router.put("")

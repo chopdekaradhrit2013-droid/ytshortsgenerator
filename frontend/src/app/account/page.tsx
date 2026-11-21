@@ -299,27 +299,46 @@ export default function AccountDashboardPage() {
               <YoutubeIcon className="w-4 h-4 text-red-500" />
               Publishing Channel
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold">
-              Connected
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              connectedChannel.connected
+                ? 'bg-emerald-500/15 text-emerald-400'
+                : 'bg-zinc-500/15 text-zinc-400'
+            }`}>
+              {connectedChannel.connected ? 'Connected' : 'Not Connected'}
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <img
-              src={connectedChannel.avatar_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80"}
-              alt="Channel Avatar"
-              className="w-10 h-10 rounded-xl object-cover border border-[#272E42]"
-            />
-            <div className="truncate">
-              <p className="text-sm font-bold text-white truncate">{connectedChannel.channel_name}</p>
-              <p className="text-[11px] text-gray-400">{connectedChannel.subscribers.toLocaleString()} subscribers</p>
+          {connectedChannel.connected ? (
+            <div className="flex items-center gap-3">
+              {connectedChannel.avatar_url && !connectedChannel.avatar_url.includes('unsplash') ? (
+                <img
+                  src={connectedChannel.avatar_url}
+                  alt="Channel Avatar"
+                  className="w-10 h-10 rounded-xl object-cover border border-[#272E42]"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-600 text-white flex items-center justify-center font-bold text-xs">
+                  {connectedChannel.channel_name ? connectedChannel.channel_name.slice(0, 2).toUpperCase() : 'YT'}
+                </div>
+              )}
+              <div className="truncate">
+                <p className="text-sm font-bold text-white truncate">{connectedChannel.channel_name}</p>
+                <p className="text-[11px] text-gray-400">
+                  {connectedChannel.subscribers > 0 ? `${connectedChannel.subscribers.toLocaleString()} subscribers` : 'Ready to publish'}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="py-1">
+              <p className="text-xs text-gray-400">No YouTube channel linked.</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Link your channel to auto-publish Shorts.</p>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-[#1C2130] flex items-center justify-between text-xs">
-            <span className="text-gray-400">Auto-sync: <strong className="text-emerald-400">Active</strong></span>
+            <span className="text-gray-400">Status: <strong className={connectedChannel.connected ? "text-emerald-400" : "text-gray-400"}>{connectedChannel.connected ? "Active" : "Unlinked"}</strong></span>
             <Link href="/publishing" className="text-purple-400 hover:underline font-semibold text-[11px]">
-              Publishing Hub →
+              {connectedChannel.connected ? "Publishing Hub →" : "Connect Channel →"}
             </Link>
           </div>
         </div>
